@@ -10,7 +10,7 @@ struct TreadmillApp: App {
         } label: {
             HStack(spacing: 4) {
                 Image(systemName: "figure.walk")
-                if appState.treadmill.isRunning {
+                if appState.treadmill.isConnected && appState.treadmill.speed > 0 {
                     Text(String(format: "%.1f", appState.treadmill.speed))
                         .font(.system(.caption, design: .monospaced))
                 }

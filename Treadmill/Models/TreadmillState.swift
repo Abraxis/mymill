@@ -27,6 +27,10 @@ final class TreadmillState {
     var deviceName: String = ""
     var lastError: String?
 
+    /// Count of consecutive zero-speed frames (hysteresis for isRunning)
+    private var zeroSpeedCount = 0
+    private static let zeroSpeedThreshold = 3
+
     var isConnected: Bool {
         connectionStatus == .connected || connectionStatus == .ready
     }
@@ -34,9 +38,16 @@ final class TreadmillState {
     func update(from frame: FTMSProtocol.TreadmillDataFrame) {
         if let s = frame.speed {
             speed = s
-            // Detect running state from live speed data
-            if s > 0 { isRunning = true }
-            else if isRunning && s == 0 { isRunning = false }
+            if s > 0 {
+                zeroSpeedCount = 0
+                isRunning = true
+            } else if isRunning {
+                // Don't immediately flip to not-running on a single zero frame
+                zeroSpeedCount += 1
+                if zeroSpeedCount >= TreadmillState.zeroSpeedThreshold {
+                    isRunning = false
+                }
+            }
         }
         if let a = frame.avgSpeed { avgSpeed = a }
         if let d = frame.totalDistance { distance = Double(d) }

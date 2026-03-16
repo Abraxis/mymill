@@ -60,7 +60,7 @@ final class SettingsManager {
             self.quickPresets = [
                 QuickPreset(name: "Walk", speed: 3.0, incline: 0),
                 QuickPreset(name: "Brisk", speed: 5.0, incline: 2),
-                QuickPreset(name: "Hill", speed: 4.0, incline: 8),
+                QuickPreset(name: "Hill", speed: 3.0, incline: 12),
             ]
         }
 
