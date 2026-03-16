@@ -13,7 +13,7 @@ struct SettingsView: View {
                 .tabItem { Label("Quick Presets", systemImage: "star") }
                 .tag(1)
         }
-        .frame(width: 450, height: 720)
+        .frame(width: 450, height: 850)
         .navigationTitle("Settings")
     }
 }
