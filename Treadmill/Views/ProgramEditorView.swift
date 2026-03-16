@@ -1,4 +1,3 @@
-// ~/src/tmill/Treadmill/Views/ProgramEditorView.swift
 import SwiftUI
 import CoreData
 
@@ -14,56 +13,56 @@ struct ProgramEditorView: View {
     @State private var selectedProgram: WorkoutProgram?
 
     var body: some View {
-        HSplitView {
-            programList
-                .frame(minWidth: 200)
-            if let program = selectedProgram {
-                ProgramDetailView(program: program)
-                    .frame(minWidth: 300)
-            } else {
-                Text("Select or create a program")
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-        }
-        .frame(minWidth: 500, minHeight: 400)
-    }
-
-    private var programList: some View {
-        VStack {
+        NavigationSplitView {
             List(selection: $selectedProgram) {
                 ForEach(programs, id: \.objectID) { program in
-                    Text(program.name)
+                    ProgramRow(program: program)
                         .tag(program)
-                        .onTapGesture { selectedProgram = program }
                 }
                 .onDelete(perform: deletePrograms)
             }
-            HStack {
-                Button(action: addProgram) {
-                    Label("New Program", systemImage: "plus")
+            .navigationSplitViewColumnWidth(min: 200, ideal: 240)
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button(action: addProgram) {
+                        Label("New Program", systemImage: "plus")
+                    }
                 }
-                .buttonStyle(.bordered)
-                Spacer()
             }
-            .padding(8)
+        } detail: {
+            if let program = selectedProgram {
+                ProgramDetailView(program: program)
+            } else {
+                ContentUnavailableView(
+                    "No Program Selected",
+                    systemImage: "figure.walk",
+                    description: Text("Select a program or create a new one.")
+                )
+            }
         }
+        .frame(minWidth: 600, minHeight: 450)
+        .navigationTitle("Workout Programs")
     }
 
     private func addProgram() {
-        let program = WorkoutProgram(entity: NSEntityDescription.entity(forEntityName: "WorkoutProgram", in: viewContext)!, insertInto: viewContext)
+        let program = WorkoutProgram(
+            entity: NSEntityDescription.entity(forEntityName: "WorkoutProgram", in: viewContext)!,
+            insertInto: viewContext
+        )
         program.id = UUID()
         program.name = "New Program"
         program.createdAt = Date()
 
-        // Add one default segment
-        let segment = ProgramSegment(entity: NSEntityDescription.entity(forEntityName: "ProgramSegment", in: viewContext)!, insertInto: viewContext)
+        let segment = ProgramSegment(
+            entity: NSEntityDescription.entity(forEntityName: "ProgramSegment", in: viewContext)!,
+            insertInto: viewContext
+        )
         segment.id = UUID()
         segment.order = 0
         segment.targetSpeed = 3.0
         segment.targetIncline = 0
         segment.goalType = GoalType.time.rawValue
-        segment.goalValue = 300  // 5 minutes
+        segment.goalValue = 300
         segment.program = program
         program.segments = NSOrderedSet(array: [segment])
 
@@ -81,43 +80,80 @@ struct ProgramEditorView: View {
     }
 }
 
+// MARK: - Program Row
+
+private struct ProgramRow: View {
+    @ObservedObject var program: WorkoutProgram
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(program.name)
+                .font(.headline)
+            let segs = program.sortedSegments
+            Text("\(segs.count) segment\(segs.count == 1 ? "" : "s") · \(totalDuration(segs))")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 2)
+    }
+
+    private func totalDuration(_ segments: [ProgramSegment]) -> String {
+        let totalSec = segments
+            .filter { $0.goalTypeEnum == .time }
+            .reduce(0.0) { $0 + $1.goalValue }
+        if totalSec > 0 {
+            let min = Int(totalSec) / 60
+            return "\(min) min"
+        }
+        return "custom goals"
+    }
+}
+
+// MARK: - Program Detail
+
 struct ProgramDetailView: View {
     @ObservedObject var program: WorkoutProgram
     @Environment(\.managedObjectContext) private var viewContext
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            TextField("Program Name", text: Binding(
-                get: { program.name },
-                set: { program.name = $0; try? viewContext.save() }
-            ))
-            .textFieldStyle(.roundedBorder)
-            .font(.title3)
-
-            Text("Segments")
-                .font(.headline)
-
-            List {
-                ForEach(program.sortedSegments, id: \.objectID) { segment in
-                    SegmentRow(segment: segment)
-                }
-                .onMove(perform: moveSegments)
-                .onDelete(perform: deleteSegments)
-            }
-
+        VStack(spacing: 0) {
+            // Header
             HStack {
+                TextField("Program Name", text: Binding(
+                    get: { program.name },
+                    set: { program.name = $0; try? viewContext.save() }
+                ))
+                .textFieldStyle(.plain)
+                .font(.title2.bold())
+
+                Spacer()
+
                 Button(action: addSegment) {
                     Label("Add Segment", systemImage: "plus")
                 }
                 .buttonStyle(.bordered)
-                Spacer()
             }
+            .padding()
+
+            Divider()
+
+            // Segments
+            List {
+                ForEach(Array(program.sortedSegments.enumerated()), id: \.element.objectID) { index, segment in
+                    SegmentCard(segment: segment, index: index + 1)
+                }
+                .onMove(perform: moveSegments)
+                .onDelete(perform: deleteSegments)
+            }
+            .listStyle(.inset(alternatesRowBackgrounds: true))
         }
-        .padding()
     }
 
     private func addSegment() {
-        let segment = ProgramSegment(entity: NSEntityDescription.entity(forEntityName: "ProgramSegment", in: viewContext)!, insertInto: viewContext)
+        let segment = ProgramSegment(
+            entity: NSEntityDescription.entity(forEntityName: "ProgramSegment", in: viewContext)!,
+            insertInto: viewContext
+        )
         segment.id = UUID()
         segment.order = Int16(program.segments.count)
         segment.targetSpeed = 3.0
@@ -160,65 +196,101 @@ struct ProgramDetailView: View {
     }
 }
 
-struct SegmentRow: View {
+// MARK: - Segment Card
+
+private struct SegmentCard: View {
     @ObservedObject var segment: ProgramSegment
     @Environment(\.managedObjectContext) private var viewContext
+    let index: Int
 
     var body: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text("Speed:")
-                        .foregroundStyle(.secondary)
-                    Stepper(
-                        String(format: "%.1f km/h", segment.targetSpeed),
-                        value: Binding(
-                            get: { segment.targetSpeed },
-                            set: { segment.targetSpeed = $0; try? viewContext.save() }
-                        ),
-                        in: FTMSProtocol.speedMin...FTMSProtocol.speedMax,
-                        step: FTMSProtocol.speedStep
-                    )
-                }
+        HStack(spacing: 16) {
+            // Segment number
+            Text("\(index)")
+                .font(.title3.bold())
+                .foregroundStyle(.secondary)
+                .frame(width: 24)
 
-                HStack {
-                    Text("Incline:")
-                        .foregroundStyle(.secondary)
-                    Stepper(
-                        String(format: "%.0f%%", segment.targetIncline),
-                        value: Binding(
-                            get: { segment.targetIncline },
-                            set: { segment.targetIncline = $0; try? viewContext.save() }
-                        ),
-                        in: FTMSProtocol.inclineMin...FTMSProtocol.inclineMax,
-                        step: FTMSProtocol.inclineStep
-                    )
-                }
-
-                HStack {
-                    Picker("Goal:", selection: Binding(
-                        get: { segment.goalType },
-                        set: { segment.goalType = $0; try? viewContext.save() }
-                    )) {
-                        ForEach(GoalType.allCases, id: \.rawValue) { type in
-                            Text(type.rawValue.capitalized).tag(type.rawValue)
-                        }
+            // Speed & Incline
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 12) {
+                    Label {
+                        Stepper(
+                            String(format: "%.1f km/h", segment.targetSpeed),
+                            value: Binding(
+                                get: { segment.targetSpeed },
+                                set: { segment.targetSpeed = $0; try? viewContext.save() }
+                            ),
+                            in: FTMSProtocol.speedMin...FTMSProtocol.speedMax,
+                            step: FTMSProtocol.speedStep
+                        )
+                    } icon: {
+                        Image(systemName: "speedometer")
+                            .foregroundStyle(.blue)
                     }
-                    .frame(width: 150)
+
+                    Label {
+                        Stepper(
+                            String(format: "%.0f%%", segment.targetIncline),
+                            value: Binding(
+                                get: { segment.targetIncline },
+                                set: { segment.targetIncline = $0; try? viewContext.save() }
+                            ),
+                            in: FTMSProtocol.inclineMin...FTMSProtocol.inclineMax,
+                            step: FTMSProtocol.inclineStep
+                        )
+                    } icon: {
+                        Image(systemName: "arrow.up.right")
+                            .foregroundStyle(.purple)
+                    }
+                }
+
+                // Goal
+                HStack(spacing: 8) {
+                    Label {
+                        Picker("", selection: Binding(
+                            get: { segment.goalType },
+                            set: { segment.goalType = $0; try? viewContext.save() }
+                        )) {
+                            ForEach(GoalType.allCases, id: \.rawValue) { type in
+                                Text(type.rawValue.capitalized).tag(type.rawValue)
+                            }
+                        }
+                        .labelsHidden()
+                        .frame(width: 100)
+                    } icon: {
+                        Image(systemName: goalIcon)
+                            .foregroundStyle(.green)
+                    }
 
                     TextField("Value", value: Binding(
                         get: { segment.goalValue },
                         set: { segment.goalValue = $0; try? viewContext.save() }
                     ), format: .number)
                     .textFieldStyle(.roundedBorder)
-                    .frame(width: 80)
+                    .frame(width: 70)
 
                     Text(goalUnit)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    Spacer()
+
+                    Text(segment.goalDescription)
+                        .font(.callout)
                         .foregroundStyle(.secondary)
                 }
             }
         }
         .padding(.vertical, 4)
+    }
+
+    private var goalIcon: String {
+        switch segment.goalTypeEnum {
+        case .time: return "clock"
+        case .distance: return "point.topleft.down.to.point.bottomright.curvepath"
+        case .calories: return "flame"
+        }
     }
 
     private var goalUnit: String {

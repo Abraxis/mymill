@@ -159,9 +159,12 @@ struct MenuBarContentView: View {
 
             Divider()
 
-            Button("▶ Start") { fire { await mgr.start() } }
-            Button("⏹ Stop") { fire { await mgr.stop() } }
-            Button("⏸ Pause") { fire { await mgr.pause() } }
+            if snap.isRunning {
+                Button("⏹ Stop") { fire { await mgr.stop() } }
+                Button("⏸ Pause") { fire { await mgr.pause() } }
+            } else {
+                Button("▶ Start") { fire { await mgr.start() } }
+            }
 
             Divider()
 
