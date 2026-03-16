@@ -2,16 +2,31 @@ import SwiftUI
 
 struct SettingsView: View {
     @Bindable var settings = SettingsManager.shared
+    @State private var selectedTab = 0
 
     var body: some View {
+        TabView(selection: $selectedTab) {
+            generalTab
+                .tabItem { Label("General", systemImage: "gearshape") }
+                .tag(0)
+
+            presetsTab
+                .tabItem { Label("Quick Presets", systemImage: "star") }
+                .tag(1)
+        }
+        .frame(width: 450, height: 320)
+        .navigationTitle("Settings")
+    }
+
+    // MARK: - General Tab
+
+    private var generalTab: some View {
         Form {
-            Section {
+            Section("Startup") {
                 Toggle("Launch at login", isOn: $settings.launchAtLogin)
-            } header: {
-                Label("General", systemImage: "gearshape")
             }
 
-            Section {
+            Section("Session Tracking") {
                 Stepper(
                     "Minimum duration: \(Int(settings.minSessionDuration / 60)) min",
                     value: Binding(
@@ -21,14 +36,9 @@ struct SettingsView: View {
                     in: 1...60,
                     step: 1
                 )
-                Text("Sessions shorter than this are not saved to history.")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-            } header: {
-                Label("Session Tracking", systemImage: "clock")
             }
 
-            Section {
+            Section("Controls") {
                 Stepper(
                     "Speed step: \(String(format: "%.1f", settings.speedIncrement)) km/h",
                     value: $settings.speedIncrement,
@@ -41,71 +51,98 @@ struct SettingsView: View {
                     in: 1...5,
                     step: 1
                 )
-            } header: {
-                Label("Controls", systemImage: "slider.horizontal.3")
             }
 
-            Section {
+            Section("Treadmill Limits") {
+                LabeledContent("Speed range") {
+                    Text("\(String(format: "%.1f", FTMSProtocol.speedMin)) – \(String(format: "%.1f", FTMSProtocol.speedMax)) km/h")
+                        .foregroundStyle(.secondary)
+                }
+                LabeledContent("Incline range") {
+                    Text("\(String(format: "%.0f", FTMSProtocol.inclineMin)) – \(String(format: "%.0f", FTMSProtocol.inclineMax))%")
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    // MARK: - Presets Tab
+
+    private var presetsTab: some View {
+        VStack(spacing: 0) {
+            // Header row
+            HStack(spacing: 0) {
+                Text("Name")
+                    .frame(width: 120, alignment: .leading)
+                Text("Speed")
+                    .frame(width: 100, alignment: .center)
+                Text("Incline")
+                    .frame(width: 100, alignment: .center)
+                Spacer()
+            }
+            .font(.caption.bold())
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+            .padding(.bottom, 6)
+
+            Divider()
+
+            List {
                 ForEach($settings.quickPresets) { $preset in
-                    HStack(spacing: 8) {
+                    HStack(spacing: 0) {
                         TextField("Name", text: $preset.name)
-                            .frame(width: 80)
+                            .textFieldStyle(.plain)
+                            .frame(width: 120)
+
+                        HStack(spacing: 4) {
+                            TextField("", value: $preset.speed, format: .number.precision(.fractionLength(1)))
+                                .textFieldStyle(.roundedBorder)
+                                .frame(width: 55)
+                            Text("km/h")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(width: 100)
+
+                        HStack(spacing: 4) {
+                            TextField("", value: $preset.incline, format: .number.precision(.fractionLength(0)))
+                                .textFieldStyle(.roundedBorder)
+                                .frame(width: 45)
+                            Text("%")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(width: 100)
+
                         Spacer()
-                        Text("Speed:")
-                            .foregroundStyle(.secondary)
-                            .font(.caption)
-                        TextField("", value: $preset.speed, format: .number.precision(.fractionLength(1)))
-                            .textFieldStyle(.roundedBorder)
-                            .frame(width: 50)
-                        Text("km/h")
-                            .foregroundStyle(.secondary)
-                            .font(.caption)
-                        Text("Incline:")
-                            .foregroundStyle(.secondary)
-                            .font(.caption)
-                        TextField("", value: $preset.incline, format: .number.precision(.fractionLength(0)))
-                            .textFieldStyle(.roundedBorder)
-                            .frame(width: 40)
-                        Text("%")
-                            .foregroundStyle(.secondary)
-                            .font(.caption)
                     }
                 }
                 .onDelete { indices in
                     settings.quickPresets.remove(atOffsets: indices)
                 }
-                Button("Add Preset") {
+            }
+
+            Divider()
+
+            HStack {
+                Button {
                     settings.quickPresets.append(
                         QuickPreset(name: "Preset", speed: 3.0, incline: 0)
                     )
+                } label: {
+                    Label("Add Preset", systemImage: "plus")
                 }
-            } header: {
-                Label("Quick Presets", systemImage: "star")
-            } footer: {
-                Text("Quick presets appear in the menu bar dropdown for one-tap speed/incline changes.")
+                .buttonStyle(.bordered)
+
+                Spacer()
+
+                Text("Presets appear in the menu bar for quick speed/incline changes.")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
             }
-
-            Section {
-                HStack {
-                    Text("Speed range")
-                    Spacer()
-                    Text("\(String(format: "%.1f", FTMSProtocol.speedMin)) – \(String(format: "%.1f", FTMSProtocol.speedMax)) km/h")
-                        .foregroundStyle(.secondary)
-                }
-                HStack {
-                    Text("Incline range")
-                    Spacer()
-                    Text("\(String(format: "%.0f", FTMSProtocol.inclineMin)) – \(String(format: "%.0f", FTMSProtocol.inclineMax))%")
-                        .foregroundStyle(.secondary)
-                }
-            } header: {
-                Label("Treadmill Limits", systemImage: "info.circle")
-            }
+            .padding(12)
         }
-        .formStyle(.grouped)
-        .frame(width: 480, height: 620)
-        .navigationTitle("Settings")
     }
 }
