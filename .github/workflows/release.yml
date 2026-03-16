@@ -1,0 +1,53 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  release:
+    runs-on: macos-15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install xcodegen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build Release
+        run: |
+          xcodebuild build \
+            -project Treadmill.xcodeproj \
+            -scheme Treadmill \
+            -configuration Release \
+            -destination 'platform=macOS' \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_ALLOWED=NO \
+            SYMROOT=build
+
+      - name: Package DMG and ZIP
+        run: |
+          APP_PATH="build/Release/Treadmill.app"
+          VERSION="${GITHUB_REF_NAME#v}"
+
+          # DMG
+          mkdir -p dmg-staging
+          cp -R "$APP_PATH" dmg-staging/
+          ln -s /Applications dmg-staging/Applications
+          hdiutil create -volname "Treadmill" -srcfolder dmg-staging -ov -format UDZO "Treadmill-${VERSION}-macOS.dmg"
+          rm -rf dmg-staging
+
+          # ZIP
+          cd build/Release && zip -r -y "../../Treadmill-${VERSION}-macOS.zip" Treadmill.app && cd ../..
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            Treadmill-*-macOS.dmg
+            Treadmill-*-macOS.zip

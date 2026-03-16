@@ -1,7 +1,8 @@
-# Treadmill
+# MyMill
 
 macOS menu bar app for controlling a **Merach T25 treadmill** via Bluetooth (FTMS protocol).
 
+[![Build and Test](https://github.com/Abraxis/mymill/actions/workflows/build.yml/badge.svg)](https://github.com/Abraxis/mymill/actions/workflows/build.yml)
 ![macOS 14+](https://img.shields.io/badge/macOS-14%2B-blue)
 ![Swift](https://img.shields.io/badge/Swift-5.9-orange)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -29,7 +30,7 @@ macOS menu bar app for controlling a **Merach T25 treadmill** via Bluetooth (FTM
 
 ### Download
 
-Grab the latest `.dmg` or `.zip` from [Releases](https://github.com/Abraxis/tmill/releases).
+Grab the latest `.dmg` or `.zip` from [Releases](https://github.com/Abraxis/mymill/releases).
 
 ### Build from source
 
@@ -38,7 +39,7 @@ Grab the latest `.dmg` or `.zip` from [Releases](https://github.com/Abraxis/tmil
 brew install xcodegen
 
 # Clone and build
-git clone https://github.com/Abraxis/tmill.git
+git clone https://github.com/Abraxis/mymill.git
 cd tmill
 xcodegen generate
 xcodebuild build -project Treadmill.xcodeproj -scheme Treadmill \
@@ -172,6 +173,27 @@ xcodebuild test -project Treadmill.xcodeproj -scheme Treadmill \
 ### Code signing
 
 Strava OAuth and HealthKit require code signing. In `project.yml`, set your `DEVELOPMENT_TEAM` or configure signing in Xcode > Signing & Capabilities.
+
+### Strava OAuth setup
+
+The app includes built-in Strava API credentials for the MyMill app. If you want to use your own:
+
+1. Create an app at [strava.com/settings/api](https://www.strava.com/settings/api)
+2. Set **Authorization Callback Domain** to `localhost`
+3. Replace `clientID` and `clientSecret` in `Treadmill/Services/StravaManager.swift`
+
+The OAuth flow works by:
+1. Opening the browser for Strava authorization
+2. Spinning up a temporary HTTP server on `localhost:8089`
+3. Catching the redirect with the authorization code
+4. Exchanging the code for access + refresh tokens
+5. Tokens are stored locally and auto-refreshed (they expire every 6 hours)
+
+### CI/CD
+
+GitHub Actions workflows:
+- **Build and Test** — runs on every push/PR to `main` (build + 33 unit tests)
+- **Release** — triggered by `v*` tags, builds Release .app, packages DMG + ZIP, creates GitHub Release with artifacts
 
 ## License
 
