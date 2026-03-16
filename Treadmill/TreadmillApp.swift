@@ -27,8 +27,8 @@ struct TreadmillApp: App {
         .menuBarExtraStyle(.window)
 
         Window("Workout History", id: "history") {
-            Text("History — Coming Soon")
-                .frame(width: 600, height: 400)
+            HistoryWindow()
+                .environment(\.managedObjectContext, PersistenceController.shared.viewContext)
         }
 
         Window("Edit Programs", id: "programs") {
