@@ -288,15 +288,22 @@ extension TreadmillManager: CBPeripheralDelegate {
 
     func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?) {
         subscribeToCharacteristics(of: peripheral)
-        // Only request control once we have the control point characteristic
-        if controlPointChar != nil && !state.hasControl {
-            print("[BLE] Control point found, requesting control on next run loop tick...")
-            // Dispatch async to let BLE stack finish processing notifications first
-            DispatchQueue.main.async {
-                Task { [weak self] in
-                    guard let self else { return }
-                    _ = await self.requestControl()
-                }
+        // requestControl is triggered from didUpdateNotificationStateFor once control point subscription is confirmed
+    }
+
+    func peripheral(_ peripheral: CBPeripheral, didUpdateNotificationStateFor characteristic: CBCharacteristic, error: Error?) {
+        let uuid = characteristic.uuid.uuidString.uppercased()
+        if let error {
+            print("[BLE WARN] Notification state error for \(uuid): \(error.localizedDescription)")
+            return
+        }
+        print("[BLE] Notification enabled for \(uuid)")
+
+        // Once control point indications are active, request control
+        if uuid == FTMSProtocol.controlPointUUID && !state.hasControl {
+            print("[BLE] Control point indications active — requesting control...")
+            Task {
+                _ = await requestControl()
             }
         }
     }
