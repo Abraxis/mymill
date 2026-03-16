@@ -20,6 +20,7 @@ final class TreadmillManager: NSObject {
     init(state: TreadmillState) {
         self.state = state
         super.init()
+        print("[BLE] TreadmillManager init — creating CBCentralManager")
         centralManager = CBCentralManager(delegate: self, queue: nil)
     }
 
@@ -32,7 +33,7 @@ final class TreadmillManager: NSObject {
             withServices: nil,
             options: [CBCentralManagerScanOptionAllowDuplicatesKey: false]
         )
-        logger.info("Started scanning for \(FTMSProtocol.deviceNamePrefix)")
+        print("[BLE] Started scanning for \(FTMSProtocol.deviceNamePrefix)")
     }
 
     func disconnect() {
@@ -50,7 +51,11 @@ final class TreadmillManager: NSObject {
     }
 
     func requestControl() async -> Bool {
-        guard controlPointChar != nil else { return false }
+        guard controlPointChar != nil else {
+            print("[BLE WARN] requestControl: no control point characteristic")
+            return false
+        }
+        print("[BLE] Requesting FTMS control...")
         let response = await sendCommand(FTMSProtocol.encodeRequestControl())
         let ok = response?.result == .success
         state.hasControl = ok
@@ -59,14 +64,19 @@ final class TreadmillManager: NSObject {
     }
 
     func start() async {
+        print("[BLE] start() called — hasControl=\(self.state.hasControl), controlPoint=\(self.controlPointChar != nil)")
         if !state.hasControl { _ = await requestControl() }
-        guard controlPointChar != nil else { return }
+        guard controlPointChar != nil else {
+            print("[BLE WARN] start: no control point characteristic, aborting")
+            return
+        }
+        print("[BLE] Sending FTMS Start command...")
         let response = await sendCommand(FTMSProtocol.encodeStart())
         if response?.result == .success {
             state.isRunning = true
         } else {
             state.lastError = "Start failed"
-            logger.warning("Start failed: \(String(describing: response?.result))")
+            print("[BLE WARN] Start failed: \(String(describing: response?.result))")
         }
     }
 
@@ -117,15 +127,22 @@ final class TreadmillManager: NSObject {
     /// Send a command and wait for the control point response.
     /// Only one command can be in flight at a time — waits for previous to finish.
     private func sendCommand(_ data: Data) async -> FTMSProtocol.ControlPointResponse? {
+        let hex = data.map { String(format: "%02x", $0) }.joined()
+        print("[BLE] sendCommand: \(hex), locked=\(self.commandLock)")
+
         // Wait for any in-flight command to complete
         while commandLock {
             try? await Task.sleep(for: .milliseconds(50))
         }
 
-        guard let peripheral, let char = controlPointChar else { return nil }
+        guard let peripheral, let char = controlPointChar else {
+            print("[BLE WARN] sendCommand: peripheral or controlPoint is nil")
+            return nil
+        }
 
         commandLock = true
         defer { commandLock = false }
+        print("[BLE] sendCommand: writing to BLE...")
 
         let response: FTMSProtocol.ControlPointResponse? = await withCheckedContinuation { continuation in
             pendingResponse = continuation
@@ -137,7 +154,7 @@ final class TreadmillManager: NSObject {
                 guard let self else { return }
                 if let c = self.pendingResponse {
                     self.pendingResponse = nil
-                    self.logger.warning("Command timed out: \(data.map { String(format: "%02x", $0) }.joined())")
+                    print("[BLE WARN] Command timed out: \(data.map { String(format: "%02x", $0) }.joined())")
                     c.resume(returning: nil)
                 }
             }
@@ -162,7 +179,7 @@ final class TreadmillManager: NSObject {
         reconnectTask = Task {
             var delay: UInt64 = 2
             while !Task.isCancelled {
-                logger.info("Reconnecting in \(delay)s...")
+                print("[BLE] Reconnecting in \(delay)s...")
                 try? await Task.sleep(for: .seconds(delay))
                 guard !Task.isCancelled else { break }
                 if centralManager?.state == .poweredOn {
@@ -185,17 +202,17 @@ final class TreadmillManager: NSObject {
                 switch uuid {
                 case FTMSProtocol.treadmillDataUUID:
                     peripheral.setNotifyValue(true, for: char)
-                    logger.info("Subscribed to Treadmill Data")
+                    print("[BLE] Subscribed to Treadmill Data")
                 case FTMSProtocol.controlPointUUID:
                     controlPointChar = char
                     peripheral.setNotifyValue(true, for: char)
-                    logger.info("Subscribed to Control Point")
+                    print("[BLE] Subscribed to Control Point")
                 case FTMSProtocol.machineStatusUUID:
                     peripheral.setNotifyValue(true, for: char)
-                    logger.info("Subscribed to Machine Status")
+                    print("[BLE] Subscribed to Machine Status")
                 case FTMSProtocol.trainingStatusUUID:
                     peripheral.setNotifyValue(true, for: char)
-                    logger.info("Subscribed to Training Status")
+                    print("[BLE] Subscribed to Training Status")
                 default:
                     break
                 }
@@ -208,6 +225,7 @@ final class TreadmillManager: NSObject {
 
 extension TreadmillManager: CBCentralManagerDelegate {
     func centralManagerDidUpdateState(_ central: CBCentralManager) {
+        print("[BLE] BLE state changed: \(String(describing: central.state.rawValue))")
         switch central.state {
         case .poweredOn:
             startScanning()
@@ -223,7 +241,7 @@ extension TreadmillManager: CBCentralManagerDelegate {
     func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral,
                         advertisementData: [String: Any], rssi RSSI: NSNumber) {
         guard let name = peripheral.name, name.hasPrefix(FTMSProtocol.deviceNamePrefix) else { return }
-        logger.info("Found \(name)")
+        print("[BLE] Found \(name)")
         central.stopScan()
         self.peripheral = peripheral
         peripheral.delegate = self
@@ -233,13 +251,13 @@ extension TreadmillManager: CBCentralManagerDelegate {
     }
 
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
-        logger.info("Connected to \(peripheral.name ?? "unknown")")
+        print("[BLE] Connected to \(peripheral.name ?? "unknown")")
         state.connectionStatus = .connected
         peripheral.discoverServices(nil)
     }
 
     func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
-        logger.warning("Disconnected: \(error?.localizedDescription ?? "none")")
+        print("[BLE WARN] Disconnected: \(error?.localizedDescription ?? "none")")
         controlPointChar = nil
         cancelPendingCommand()
         state.hasControl = false
@@ -252,7 +270,7 @@ extension TreadmillManager: CBCentralManagerDelegate {
     }
 
     func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
-        logger.error("Failed to connect: \(error?.localizedDescription ?? "unknown")")
+        print("[BLE ERROR] Failed to connect: \(error?.localizedDescription ?? "unknown")")
         state.connectionStatus = .disconnected
         scheduleReconnect()
     }
@@ -270,15 +288,34 @@ extension TreadmillManager: CBPeripheralDelegate {
 
     func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?) {
         subscribeToCharacteristics(of: peripheral)
-        // Auto-request control after all characteristics are subscribed
-        Task {
-            _ = await requestControl()
+        // Only request control once we have the control point characteristic
+        if controlPointChar != nil && !state.hasControl {
+            print("[BLE] Control point found, requesting control on next run loop tick...")
+            // Dispatch async to let BLE stack finish processing notifications first
+            DispatchQueue.main.async {
+                Task { [weak self] in
+                    guard let self else { return }
+                    _ = await self.requestControl()
+                }
+            }
         }
     }
 
     func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
         guard let data = characteristic.value else { return }
         let uuid = characteristic.uuid.uuidString.uppercased()
+
+        switch uuid {
+        case FTMSProtocol.treadmillDataUUID:
+            // Don't log every data frame (too noisy) — just first one
+            break // fall through to decode below
+        case FTMSProtocol.controlPointUUID:
+            print("[BLE] Control Point response: \(data.map { String(format: "%02x", $0) }.joined())")
+        case FTMSProtocol.machineStatusUUID:
+            print("[BLE] Machine Status: \(data.map { String(format: "%02x", $0) }.joined())")
+        default:
+            break
+        }
 
         switch uuid {
         case FTMSProtocol.treadmillDataUUID:

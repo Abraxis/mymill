@@ -1,4 +1,7 @@
 import SwiftUI
+import os
+
+private let logger = Logger(subsystem: "com.treadmill.app", category: "App")
 
 @main
 struct TreadmillApp: App {
@@ -10,7 +13,7 @@ struct TreadmillApp: App {
         } label: {
             HStack(spacing: 4) {
                 Image(systemName: "figure.walk")
-                if appState.treadmill.isConnected {
+                if appState.treadmill.isRunning {
                     Text(String(format: "%.1f", appState.treadmill.speed))
                         .font(.system(.caption, design: .monospaced))
                 }
@@ -39,11 +42,13 @@ final class AppState {
     let treadmill = TreadmillState()
     let persistence = PersistenceController.shared
     let settings = SettingsManager.shared
-    var manager: TreadmillManager!
+    let manager: TreadmillManager
     var sessionTracker: SessionTracker!
     var programEngine: ProgramEngine!
 
     init() {
+        logger.info("AppState init — creating manager")
+        manager = TreadmillManager(state: treadmill)
         programEngine = ProgramEngine(state: treadmill)
         sessionTracker = SessionTracker(
             state: treadmill,
@@ -51,47 +56,43 @@ final class AppState {
             minDuration: settings.minSessionDuration
         )
 
-        // Defer BLE init slightly so SwiftUI has time to set up
-        DispatchQueue.main.async { [self] in
-            manager = TreadmillManager(state: treadmill)
+        // Sleep/wake
+        let mgr = manager
+        let workspace = NSWorkspace.shared
+        workspace.notificationCenter.addObserver(
+            forName: NSWorkspace.willSleepNotification,
+            object: nil, queue: .main
+        ) { _ in mgr.disconnect() }
+        workspace.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification,
+            object: nil, queue: .main
+        ) { _ in mgr.startScanning() }
 
-            // Sleep/wake
-            let workspace = NSWorkspace.shared
-            workspace.notificationCenter.addObserver(
-                forName: NSWorkspace.willSleepNotification,
-                object: nil, queue: .main
-            ) { [weak self] _ in self?.manager.disconnect() }
-            workspace.notificationCenter.addObserver(
-                forName: NSWorkspace.didWakeNotification,
-                object: nil, queue: .main
-            ) { [weak self] _ in self?.manager.startScanning() }
-
-            // Periodic tracking
-            Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
-                guard let self else { return }
-                Task { @MainActor in
-                    self.sessionTracker.check()
-                    self.sessionTracker.recordSample()
-                    self.programEngine.updateFromState()
-                    if let speed = self.programEngine.pendingSpeed {
-                        await self.manager.setSpeed(speed)
-                        self.programEngine.clearPendingCommands()
-                    }
-                    if let incline = self.programEngine.pendingIncline {
-                        await self.manager.setIncline(incline)
-                        self.programEngine.clearPendingCommands()
-                    }
-                    if self.programEngine.shouldStop {
-                        await self.manager.stop()
-                        self.programEngine.stop()
-                    }
+        // Periodic tracking
+        Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            Task { @MainActor in
+                self.sessionTracker.check()
+                self.sessionTracker.recordSample()
+                self.programEngine.updateFromState()
+                if let speed = self.programEngine.pendingSpeed {
+                    await self.manager.setSpeed(speed)
+                    self.programEngine.clearPendingCommands()
+                }
+                if let incline = self.programEngine.pendingIncline {
+                    await self.manager.setIncline(incline)
+                    self.programEngine.clearPendingCommands()
+                }
+                if self.programEngine.shouldStop {
+                    await self.manager.stop()
+                    self.programEngine.stop()
                 }
             }
         }
     }
 }
 
-/// Menu content using standard menu items
+/// Menu content — uses fire-and-forget for BLE commands (menu closes on click)
 struct MenuBarContentView: View {
     let appState: AppState
     @Environment(\.openWindow) private var openWindow
@@ -113,46 +114,33 @@ struct MenuBarContentView: View {
 
             Divider()
 
-            Button("Start") {
-                Task { await appState.manager?.start() }
-            }
-            .disabled(t.isRunning)
-            .keyboardShortcut("s", modifiers: [])
+            Button("▶ Start") { fireCommand { await appState.manager.start() } }
+                .disabled(t.isRunning)
 
-            Button("Stop") {
-                Task { await appState.manager?.stop() }
-            }
-            .disabled(!t.isRunning)
-            .keyboardShortcut("x", modifiers: [])
+            Button("⏹ Stop") { fireCommand { await appState.manager.stop() } }
+                .disabled(!t.isRunning)
 
-            Button("Pause") {
-                Task { await appState.manager?.pause() }
-            }
-            .disabled(!t.isRunning)
-            .keyboardShortcut("p", modifiers: [])
+            Button("⏸ Pause") { fireCommand { await appState.manager.pause() } }
+                .disabled(!t.isRunning)
 
             Divider()
 
             let s = appState.settings
-            Button("Speed +") {
-                Task { await appState.manager?.setSpeed(t.targetSpeed + s.speedIncrement) }
+            Button("Speed + (\(String(format: "%.1f", s.speedIncrement)))") {
+                fireCommand { await appState.manager.setSpeed(t.targetSpeed + s.speedIncrement) }
             }
-            .keyboardShortcut(.upArrow, modifiers: [])
 
-            Button("Speed -") {
-                Task { await appState.manager?.setSpeed(t.targetSpeed - s.speedIncrement) }
+            Button("Speed − (\(String(format: "%.1f", s.speedIncrement)))") {
+                fireCommand { await appState.manager.setSpeed(t.targetSpeed - s.speedIncrement) }
             }
-            .keyboardShortcut(.downArrow, modifiers: [])
 
-            Button("Incline +") {
-                Task { await appState.manager?.setIncline(t.targetIncline + s.inclineIncrement) }
+            Button("Incline + (\(String(format: "%.0f", s.inclineIncrement))%)") {
+                fireCommand { await appState.manager.setIncline(t.targetIncline + s.inclineIncrement) }
             }
-            .keyboardShortcut(.rightArrow, modifiers: [])
 
-            Button("Incline -") {
-                Task { await appState.manager?.setIncline(t.targetIncline - s.inclineIncrement) }
+            Button("Incline − (\(String(format: "%.0f", s.inclineIncrement))%)") {
+                fireCommand { await appState.manager.setIncline(t.targetIncline - s.inclineIncrement) }
             }
-            .keyboardShortcut(.leftArrow, modifiers: [])
 
             if let engine = appState.programEngine, engine.isActive {
                 Divider()
@@ -178,10 +166,18 @@ struct MenuBarContentView: View {
             .keyboardShortcut("q")
     }
 
+    /// Fire-and-forget: detached task so menu dismissal doesn't cancel it
+    private func fireCommand(_ action: @escaping @Sendable () async -> Void) {
+        logger.info("Menu command fired")
+        Task.detached {
+            await action()
+        }
+    }
+
     private var statusLine: String {
         let t = appState.treadmill
         if t.isConnected {
-            return "\(t.deviceName) — \(String(format: "%.1f", t.speed)) km/h"
+            return "\(t.deviceName) — \(t.isRunning ? String(format: "%.1f km/h", t.speed) : "Idle")"
         }
         return "Treadmill"
     }
