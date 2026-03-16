@@ -49,8 +49,13 @@ private struct GeneralSettingsTab: View {
                             .foregroundStyle(.tertiary)
                     }
                 } else {
-                    Text("Apple Health is not available on this Mac.")
-                        .foregroundStyle(.secondary)
+                    LabeledContent("Apple Health") {
+                        Text("Not available")
+                            .foregroundStyle(.secondary)
+                    }
+                    Text("HealthKit requires the Apple Health app which is not yet available on macOS. Workouts will sync when running on a Mac with Health support or via a future update.")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
                 }
             }
 

@@ -28,21 +28,23 @@ final class HealthKitManager {
 
     private init() {
         self.syncEnabled = UserDefaults.standard.bool(forKey: "healthKitSyncEnabled")
-        // On macOS, isHealthDataAvailable() returns false even though the framework works.
-        // We attempt authorization regardless and set isAvailable based on the result.
-        self.isAvailable = true
+        self.isAvailable = HKHealthStore.isHealthDataAvailable()
     }
 
     func requestAuthorization() async -> Bool {
         do {
             try await healthStore.requestAuthorization(toShare: writeTypes, read: readTypes)
-            isAuthorized = true
-            logger.info("HealthKit authorization granted")
+            await MainActor.run {
+                isAuthorized = true
+            }
+            print("[HealthKit] Authorization granted")
             return true
         } catch {
-            logger.error("HealthKit authorization failed: \(error.localizedDescription)")
-            isAuthorized = false
-            isAvailable = false
+            print("[HealthKit] Authorization failed: \(error.localizedDescription)")
+            await MainActor.run {
+                isAuthorized = false
+                isAvailable = false
+            }
             return false
         }
     }
