@@ -7,7 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		7B2B05437A66646FAD982C53 /* FTMSProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4727DB6832FFE8B4C4F520E5 /* FTMSProtocol.swift */; };
 		96FE58A86E46C2B08E69B4AE /* TreadmillApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3CCDAFD497A331B683756DB /* TreadmillApp.swift */; };
+		F63FEC9E7A68CC9C571E011E /* FTMSProtocolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63D55714BB4F7F78C61CE66A /* FTMSProtocolTests.swift */; };
 		FD4A859A6C0B9EA5E8E5F46B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 38A78BC9B8364D89A6A6F0C5 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
@@ -26,6 +28,8 @@
 		287922C91CC40671F28072DC /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		368650DFDE4ECA68E825A680 /* Treadmill.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Treadmill.entitlements; sourceTree = "<group>"; };
 		38A78BC9B8364D89A6A6F0C5 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		4727DB6832FFE8B4C4F520E5 /* FTMSProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FTMSProtocol.swift; sourceTree = "<group>"; };
+		63D55714BB4F7F78C61CE66A /* FTMSProtocolTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FTMSProtocolTests.swift; sourceTree = "<group>"; };
 		A3CCDAFD497A331B683756DB /* TreadmillApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TreadmillApp.swift; sourceTree = "<group>"; };
 		A4FB5B541ABB9DCB1E8890CB /* Treadmill.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Treadmill.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -63,6 +67,7 @@
 		9A9BB2BB93DC04AFCE0532CC /* TreadmillTests */ = {
 			isa = PBXGroup;
 			children = (
+				63D55714BB4F7F78C61CE66A /* FTMSProtocolTests.swift */,
 			);
 			path = TreadmillTests;
 			sourceTree = "<group>";
@@ -79,6 +84,7 @@
 		DB2B32DEF6F18BF65C48030D /* Bluetooth */ = {
 			isa = PBXGroup;
 			children = (
+				4727DB6832FFE8B4C4F520E5 /* FTMSProtocol.swift */,
 			);
 			path = Bluetooth;
 			sourceTree = "<group>";
@@ -185,6 +191,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F63FEC9E7A68CC9C571E011E /* FTMSProtocolTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -192,6 +199,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7B2B05437A66646FAD982C53 /* FTMSProtocol.swift in Sources */,
 				96FE58A86E46C2B08E69B4AE /* TreadmillApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
