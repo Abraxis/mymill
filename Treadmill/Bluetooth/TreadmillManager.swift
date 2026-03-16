@@ -10,8 +10,10 @@ final class TreadmillManager: NSObject {
     private var peripheral: CBPeripheral?
     private var controlPointChar: CBCharacteristic?
     private var reconnectTask: Task<Void, Never>?
-    private var controlContinuation: CheckedContinuation<FTMSProtocol.ControlPointResponse?, Never>?
-    private var isInitialized = false
+
+    /// Serial queue for BLE control point commands — prevents concurrent sends
+    private var pendingResponse: CheckedContinuation<FTMSProtocol.ControlPointResponse?, Never>?
+    private var commandLock = false
 
     private let logger = Logger(subsystem: "com.treadmill.app", category: "BLE")
 
@@ -21,12 +23,13 @@ final class TreadmillManager: NSObject {
         // Defer BLE init to avoid triggering state changes during SwiftUI layout
         DispatchQueue.main.async { [self] in
             centralManager = CBCentralManager(delegate: self, queue: nil)
-            isInitialized = true
         }
     }
 
+    // MARK: - Public API
+
     func startScanning() {
-        guard centralManager.state == .poweredOn else { return }
+        guard centralManager != nil, centralManager.state == .poweredOn else { return }
         state.connectionStatus = .scanning
         centralManager.scanForPeripherals(
             withServices: nil,
@@ -39,19 +42,19 @@ final class TreadmillManager: NSObject {
         reconnectTask?.cancel()
         reconnectTask = nil
         if let p = peripheral {
-            centralManager.cancelPeripheralConnection(p)
+            centralManager?.cancelPeripheralConnection(p)
         }
         peripheral = nil
         controlPointChar = nil
+        cancelPendingCommand()
         state.connectionStatus = .disconnected
         state.hasControl = false
         state.isRunning = false
     }
 
     func requestControl() async -> Bool {
-        guard let char = controlPointChar else { return false }
-        let data = FTMSProtocol.encodeRequestControl()
-        let response = await sendControlPoint(data, on: char)
+        guard controlPointChar != nil else { return false }
+        let response = await sendCommand(FTMSProtocol.encodeRequestControl())
         let ok = response?.result == .success
         state.hasControl = ok
         if ok { state.connectionStatus = .ready }
@@ -60,18 +63,19 @@ final class TreadmillManager: NSObject {
 
     func start() async {
         if !state.hasControl { _ = await requestControl() }
-        guard let char = controlPointChar else { return }
-        let response = await sendControlPoint(FTMSProtocol.encodeStart(), on: char)
+        guard controlPointChar != nil else { return }
+        let response = await sendCommand(FTMSProtocol.encodeStart())
         if response?.result == .success {
             state.isRunning = true
         } else {
             state.lastError = "Start failed"
+            logger.warning("Start failed: \(String(describing: response?.result))")
         }
     }
 
     func stop() async {
-        guard let char = controlPointChar else { return }
-        let response = await sendControlPoint(FTMSProtocol.encodeStop(), on: char)
+        guard controlPointChar != nil else { return }
+        let response = await sendCommand(FTMSProtocol.encodeStop())
         if response?.result == .success {
             state.isRunning = false
         } else {
@@ -80,8 +84,8 @@ final class TreadmillManager: NSObject {
     }
 
     func pause() async {
-        guard let char = controlPointChar else { return }
-        let response = await sendControlPoint(FTMSProtocol.encodePause(), on: char)
+        guard controlPointChar != nil else { return }
+        let response = await sendCommand(FTMSProtocol.encodePause())
         if response?.result == .success {
             state.isRunning = false
         } else {
@@ -91,11 +95,10 @@ final class TreadmillManager: NSObject {
 
     func setSpeed(_ kmh: Double) async {
         if !state.hasControl { _ = await requestControl() }
-        guard let char = controlPointChar else { return }
+        guard controlPointChar != nil else { return }
         let clamped = max(FTMSProtocol.speedMin, min(FTMSProtocol.speedMax, kmh))
         state.targetSpeed = clamped
-        let data = FTMSProtocol.encodeSetSpeed(kmh: clamped)
-        let response = await sendControlPoint(data, on: char)
+        let response = await sendCommand(FTMSProtocol.encodeSetSpeed(kmh: clamped))
         if response?.result != .success {
             state.lastError = "Speed change failed"
         }
@@ -103,30 +106,59 @@ final class TreadmillManager: NSObject {
 
     func setIncline(_ percent: Double) async {
         if !state.hasControl { _ = await requestControl() }
-        guard let char = controlPointChar else { return }
+        guard controlPointChar != nil else { return }
         let clamped = max(FTMSProtocol.inclineMin, min(FTMSProtocol.inclineMax, percent))
         state.targetIncline = clamped
-        let data = FTMSProtocol.encodeSetIncline(percent: clamped)
-        let response = await sendControlPoint(data, on: char)
+        let response = await sendCommand(FTMSProtocol.encodeSetIncline(percent: clamped))
         if response?.result != .success {
             state.lastError = "Incline change failed"
         }
     }
 
-    private func sendControlPoint(_ data: Data, on char: CBCharacteristic) async -> FTMSProtocol.ControlPointResponse? {
-        guard let peripheral else { return nil }
-        return await withCheckedContinuation { continuation in
-            self.controlContinuation = continuation
+    // MARK: - Command Serialization
+
+    /// Send a command and wait for the control point response.
+    /// Only one command can be in flight at a time — waits for previous to finish.
+    private func sendCommand(_ data: Data) async -> FTMSProtocol.ControlPointResponse? {
+        // Wait for any in-flight command to complete
+        while commandLock {
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+
+        guard let peripheral, let char = controlPointChar else { return nil }
+
+        commandLock = true
+        defer { commandLock = false }
+
+        let response: FTMSProtocol.ControlPointResponse? = await withCheckedContinuation { continuation in
+            pendingResponse = continuation
             peripheral.writeValue(data, for: char, type: .withResponse)
-            Task {
+
+            // Timeout — ensure continuation always resumes
+            Task { [weak self] in
                 try? await Task.sleep(for: .seconds(5))
-                if let c = self.controlContinuation {
-                    self.controlContinuation = nil
+                guard let self else { return }
+                if let c = self.pendingResponse {
+                    self.pendingResponse = nil
+                    self.logger.warning("Command timed out: \(data.map { String(format: "%02x", $0) }.joined())")
                     c.resume(returning: nil)
                 }
             }
         }
+
+        return response
     }
+
+    /// Cancel any pending command (e.g., on disconnect)
+    private func cancelPendingCommand() {
+        if let c = pendingResponse {
+            pendingResponse = nil
+            c.resume(returning: nil)
+        }
+        commandLock = false
+    }
+
+    // MARK: - Reconnect
 
     private func scheduleReconnect() {
         reconnectTask?.cancel()
@@ -136,7 +168,7 @@ final class TreadmillManager: NSObject {
                 logger.info("Reconnecting in \(delay)s...")
                 try? await Task.sleep(for: .seconds(delay))
                 guard !Task.isCancelled else { break }
-                if centralManager.state == .poweredOn {
+                if centralManager?.state == .poweredOn {
                     startScanning()
                     break
                 }
@@ -144,6 +176,8 @@ final class TreadmillManager: NSObject {
             }
         }
     }
+
+    // MARK: - Characteristic Discovery
 
     private func subscribeToCharacteristics(of peripheral: CBPeripheral) {
         guard let services = peripheral.services else { return }
@@ -154,13 +188,17 @@ final class TreadmillManager: NSObject {
                 switch uuid {
                 case FTMSProtocol.treadmillDataUUID:
                     peripheral.setNotifyValue(true, for: char)
+                    logger.info("Subscribed to Treadmill Data")
                 case FTMSProtocol.controlPointUUID:
                     controlPointChar = char
                     peripheral.setNotifyValue(true, for: char)
+                    logger.info("Subscribed to Control Point")
                 case FTMSProtocol.machineStatusUUID:
                     peripheral.setNotifyValue(true, for: char)
+                    logger.info("Subscribed to Machine Status")
                 case FTMSProtocol.trainingStatusUUID:
                     peripheral.setNotifyValue(true, for: char)
+                    logger.info("Subscribed to Training Status")
                 default:
                     break
                 }
@@ -169,19 +207,26 @@ final class TreadmillManager: NSObject {
     }
 }
 
+// MARK: - CBCentralManagerDelegate
+
 extension TreadmillManager: CBCentralManagerDelegate {
     func centralManagerDidUpdateState(_ central: CBCentralManager) {
         switch central.state {
-        case .poweredOn: startScanning()
-        case .poweredOff: state.connectionStatus = .poweredOff
-        case .unauthorized: state.connectionStatus = .unauthorized
-        default: state.connectionStatus = .disconnected
+        case .poweredOn:
+            startScanning()
+        case .poweredOff:
+            state.connectionStatus = .poweredOff
+        case .unauthorized:
+            state.connectionStatus = .unauthorized
+        default:
+            state.connectionStatus = .disconnected
         }
     }
 
     func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral,
                         advertisementData: [String: Any], rssi RSSI: NSNumber) {
         guard let name = peripheral.name, name.hasPrefix(FTMSProtocol.deviceNamePrefix) else { return }
+        logger.info("Found \(name)")
         central.stopScan()
         self.peripheral = peripheral
         peripheral.delegate = self
@@ -191,28 +236,32 @@ extension TreadmillManager: CBCentralManagerDelegate {
     }
 
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
+        logger.info("Connected to \(peripheral.name ?? "unknown")")
         state.connectionStatus = .connected
         peripheral.discoverServices(nil)
     }
 
     func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
+        logger.warning("Disconnected: \(error?.localizedDescription ?? "none")")
         controlPointChar = nil
+        cancelPendingCommand()
         state.hasControl = false
         let wasRunning = state.isRunning
-        if wasRunning {
-            state.connectionStatus = .disconnected
-        } else {
-            state.connectionStatus = .disconnected
+        state.connectionStatus = .disconnected
+        if !wasRunning {
             state.isRunning = false
         }
         scheduleReconnect()
     }
 
     func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
+        logger.error("Failed to connect: \(error?.localizedDescription ?? "unknown")")
         state.connectionStatus = .disconnected
         scheduleReconnect()
     }
 }
+
+// MARK: - CBPeripheralDelegate
 
 extension TreadmillManager: CBPeripheralDelegate {
     func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
@@ -224,34 +273,45 @@ extension TreadmillManager: CBPeripheralDelegate {
 
     func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?) {
         subscribeToCharacteristics(of: peripheral)
-        Task { _ = await requestControl() }
+        // Auto-request control after all characteristics are subscribed
+        Task {
+            _ = await requestControl()
+        }
     }
 
     func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
         guard let data = characteristic.value else { return }
         let uuid = characteristic.uuid.uuidString.uppercased()
+
         switch uuid {
         case FTMSProtocol.treadmillDataUUID:
             let frame = FTMSProtocol.decodeTreadmillData(data)
-            Task { @MainActor in state.update(from: frame) }
+            Task { @MainActor in
+                state.update(from: frame)
+            }
         case FTMSProtocol.controlPointUUID:
-            if let response = FTMSProtocol.decodeControlPointResponse(data),
-               let c = controlContinuation {
-                controlContinuation = nil
-                c.resume(returning: response)
+            if let response = FTMSProtocol.decodeControlPointResponse(data) {
+                if let c = pendingResponse {
+                    pendingResponse = nil
+                    c.resume(returning: response)
+                }
             }
         case FTMSProtocol.machineStatusUUID:
             handleMachineStatus(data)
-        default: break
+        default:
+            break
         }
     }
 
     private func handleMachineStatus(_ data: Data) {
         guard !data.isEmpty else { return }
         switch data[0] {
-        case 0x04: Task { @MainActor in state.isRunning = true }
-        case 0x02, 0x03: Task { @MainActor in state.isRunning = false }
-        default: break
+        case 0x04: // Started/Resumed
+            Task { @MainActor in state.isRunning = true }
+        case 0x02, 0x03: // Stopped/Paused, Stopped by safety
+            Task { @MainActor in state.isRunning = false }
+        default:
+            break
         }
     }
 }
