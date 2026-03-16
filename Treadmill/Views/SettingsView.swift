@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @Bindable var settings = SettingsManager.shared
+    @Bindable var healthKit = HealthKitManager.shared
     @State private var selectedTab = 0
 
     var body: some View {
@@ -14,7 +15,7 @@ struct SettingsView: View {
                 .tabItem { Label("Quick Presets", systemImage: "star") }
                 .tag(1)
         }
-        .frame(width: 450, height: 540)
+        .frame(width: 450, height: 620)
         .navigationTitle("Settings")
     }
 
@@ -24,6 +25,25 @@ struct SettingsView: View {
         Form {
             Section("Startup") {
                 Toggle("Launch at login", isOn: $settings.launchAtLogin)
+            }
+
+            Section("Apple Health") {
+                if healthKit.isAvailable {
+                    Toggle("Sync workouts to Health", isOn: $healthKit.syncEnabled)
+                        .onChange(of: healthKit.syncEnabled) { _, newValue in
+                            if newValue {
+                                Task { _ = await healthKit.requestAuthorization() }
+                            }
+                        }
+                    if healthKit.syncEnabled {
+                        Text("Completed treadmill sessions are saved as indoor walking workouts.")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
+                } else {
+                    Text("Apple Health is not available on this Mac.")
+                        .foregroundStyle(.secondary)
+                }
             }
 
             Section("Session Tracking") {

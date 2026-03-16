@@ -113,19 +113,43 @@ final class SessionTracker {
     }
 
     private func saveSession(duration: TimeInterval) {
+        let startDate = sessionStartDate ?? Date()
+        let endDate = Date()
+        let distance = state.distance - sessionStartDistance
+        let calories = Int32(state.calories - sessionStartCalories)
+        let avgSpeed = state.avgSpeed
+        let avgIncline = inclineSampleCount > 0 ? inclineSum / Double(inclineSampleCount) : 0
+
+        // Save to Core Data
         let context = persistence.viewContext
         let session = WorkoutSession(entity: NSEntityDescription.entity(forEntityName: "WorkoutSession", in: context)!, insertInto: context)
         session.id = UUID()
-        session.date = sessionStartDate ?? Date()
+        session.date = startDate
         session.duration = duration
-        session.distance = state.distance - sessionStartDistance
-        session.calories = Int32(state.calories - sessionStartCalories)
-        session.avgSpeed = state.avgSpeed
+        session.distance = distance
+        session.calories = calories
+        session.avgSpeed = avgSpeed
         session.maxSpeed = maxSpeed
-        session.avgIncline = inclineSampleCount > 0 ? inclineSum / Double(inclineSampleCount) : 0
+        session.avgIncline = avgIncline
         session.speedSamples = try? JSONEncoder().encode(samples)
 
         persistence.save()
-        logger.info("Session saved: \(session.distance)m, \(session.duration)s")
+        logger.info("Session saved: \(distance)m, \(duration)s")
+
+        // Save to HealthKit
+        let hkSamples = samples.map { sample in
+            (date: startDate.addingTimeInterval(sample.time), speedKmh: sample.speed)
+        }
+        Task {
+            await HealthKitManager.shared.saveWorkout(
+                startDate: startDate,
+                endDate: endDate,
+                distanceMeters: distance,
+                calories: Int(calories),
+                avgSpeedKmh: avgSpeed,
+                maxSpeedKmh: maxSpeed,
+                speedSamples: hkSamples
+            )
+        }
     }
 }
