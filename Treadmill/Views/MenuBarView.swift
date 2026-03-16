@@ -3,7 +3,7 @@ import SwiftUI
 
 struct MenuBarView: View {
     let treadmillState: TreadmillState
-    let manager: TreadmillManager
+    let manager: TreadmillManager?
     let programEngine: ProgramEngine?
     let onOpenHistory: () -> Void
     let onOpenPrograms: () -> Void
@@ -13,7 +13,7 @@ struct MenuBarView: View {
     private var settings = SettingsManager.shared
 
     init(treadmillState: TreadmillState,
-         manager: TreadmillManager,
+         manager: TreadmillManager?,
          programEngine: ProgramEngine? = nil,
          onOpenHistory: @escaping () -> Void,
          onOpenPrograms: @escaping () -> Void,
@@ -64,7 +64,7 @@ struct MenuBarView: View {
         .onKeyPress(.leftArrow) { adjustIncline(up: false); return .handled }
         .onKeyPress(.rightArrow) { adjustIncline(up: true); return .handled }
         .onKeyPress(.space) { toggleStartPause(); return .handled }
-        .onKeyPress(.escape) { Task { await manager.stop() }; return .handled }
+        .onKeyPress(.escape) { Task { await manager?.stop() }; return .handled }
     }
 
     // MARK: - Sections
@@ -108,7 +108,7 @@ struct MenuBarView: View {
 
     private var controlsSection: some View {
         HStack(spacing: 8) {
-            Button(action: { Task { await manager.start() } }) {
+            Button(action: { Task { await manager?.start() } }) {
                 Label("Start", systemImage: "play.fill")
                     .frame(maxWidth: .infinity)
             }
@@ -116,14 +116,14 @@ struct MenuBarView: View {
             .tint(.green)
             .disabled(!treadmillState.isConnected || treadmillState.isRunning)
 
-            Button(action: { Task { await manager.stop() } }) {
+            Button(action: { Task { await manager?.stop() } }) {
                 Label("Stop", systemImage: "stop.fill")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.bordered)
             .disabled(!treadmillState.isRunning)
 
-            Button(action: { Task { await manager.pause() } }) {
+            Button(action: { Task { await manager?.pause() } }) {
                 Label("Pause", systemImage: "pause.fill")
                     .frame(maxWidth: .infinity)
             }
@@ -243,20 +243,20 @@ struct MenuBarView: View {
 
     private func adjustSpeed(up: Bool) {
         let new = treadmillState.targetSpeed + (up ? settings.speedIncrement : -settings.speedIncrement)
-        Task { await manager.setSpeed(new) }
+        Task { await manager?.setSpeed(new) }
     }
 
     private func adjustIncline(up: Bool) {
         let new = treadmillState.targetIncline + (up ? settings.inclineIncrement : -settings.inclineIncrement)
-        Task { await manager.setIncline(new) }
+        Task { await manager?.setIncline(new) }
     }
 
     private func toggleStartPause() {
         Task {
             if treadmillState.isRunning {
-                await manager.pause()
+                await manager?.pause()
             } else {
-                await manager.start()
+                await manager?.start()
             }
         }
     }

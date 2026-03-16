@@ -11,13 +11,18 @@ final class TreadmillManager: NSObject {
     private var controlPointChar: CBCharacteristic?
     private var reconnectTask: Task<Void, Never>?
     private var controlContinuation: CheckedContinuation<FTMSProtocol.ControlPointResponse?, Never>?
+    private var isInitialized = false
 
     private let logger = Logger(subsystem: "com.treadmill.app", category: "BLE")
 
     init(state: TreadmillState) {
         self.state = state
         super.init()
-        centralManager = CBCentralManager(delegate: self, queue: nil)
+        // Defer BLE init to avoid triggering state changes during SwiftUI layout
+        DispatchQueue.main.async { [self] in
+            centralManager = CBCentralManager(delegate: self, queue: nil)
+            isInitialized = true
+        }
     }
 
     func startScanning() {
