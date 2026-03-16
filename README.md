@@ -14,14 +14,16 @@ macOS menu bar app for controlling a **Merach T25 treadmill** via Bluetooth (FTM
 - **Session tracking** — auto-records workouts with distance, time, calories, speed over time
 - **Workout history** — browse past sessions with charts (speed/incline over time, weekly trends)
 - **Interval programs** — create multi-segment workouts with speed, incline, and time/distance/calorie goals
+- **Strava sync** — auto-uploads completed workouts to Strava as indoor walking activities with per-sample speed data
 - **Apple Health** — ready to sync workouts when HealthKit becomes available on macOS
-- **Settings** — configurable speed/incline steps, session duration threshold, launch at login
+- **Settings** — configurable speed/incline steps, session duration threshold, quick presets, launch at login
 
 ## Requirements
 
 - macOS 14 (Sonoma) or later
 - Merach T25 treadmill (or compatible FTMS Bluetooth treadmill)
 - Bluetooth enabled
+- Strava account (optional, for workout sync)
 
 ## Install
 
@@ -46,50 +48,63 @@ xcodebuild build -project Treadmill.xcodeproj -scheme Treadmill \
 open build/Release/Treadmill.app
 ```
 
-Or open `Treadmill.xcodeproj` in Xcode and hit ⌘R.
+Or open `Treadmill.xcodeproj` in Xcode and hit Cmd+R.
 
 ## Usage
 
 1. **Turn on your Merach T25** using its remote control
-2. **Launch Treadmill** — it appears as a 🚶 icon in the menu bar
+2. **Launch Treadmill** — it appears as a walking icon in the menu bar
 3. The app auto-connects via Bluetooth (status shown in the dropdown)
 4. **Click the menu bar icon** to see live stats and controls
-5. Use **Start/Stop/Pause** and **Speed ±/Incline ±** to control the treadmill
+5. Use **Start/Stop/Pause** and **Speed +/-** to control the treadmill
 6. **Quick presets** let you switch speed/incline with one click
 
 ### Menu bar
 
 | State | Menu bar shows |
 |-------|---------------|
-| Disconnected | 🚶 icon only |
-| Connected, idle | 🚶 icon only |
-| Running | 🚶 + current speed (e.g. `3.5`) |
-
-### Keyboard shortcuts (when menu is open)
-
-The treadmill must be started first using its remote control before the app can send commands.
+| Disconnected | Walking icon only |
+| Connected, idle | Walking icon only |
+| Running | Walking icon + current speed (e.g. `3.5`) |
 
 ### Settings
 
-Access from the menu dropdown → **Settings...**
+Access from the menu dropdown > **Settings...**
 
 **General tab:**
 - Launch at login
 - Apple Health sync status
+- Strava connection and auto-sync toggle
 - Minimum session duration (sessions shorter than this aren't saved)
 - Speed/incline step sizes for the +/- buttons
+- Treadmill speed and incline limits
 
 **Quick Presets tab:**
-- Create named presets with specific speed and incline
+- Create named presets with specific speed and incline values
 - Presets appear in the menu dropdown for one-tap changes
+- Default presets: Walk (3.0 km/h), Brisk (5.0 km/h, 2%), Hill (3.0 km/h, 12%)
+
+### Strava Integration
+
+1. Open **Settings > General > Strava**
+2. Click **Connect to Strava** — browser opens for authorization
+3. Approve access and return to the app
+4. Enable **Auto-sync workouts**
+5. Completed treadmill sessions are uploaded automatically as indoor walking activities
+
+Uploaded data includes:
+- Activity type: Walk (indoor/trainer)
+- Per-sample speed data (TCX format, every 5 seconds)
+- Total distance, duration, and calories
+- Cumulative distance per trackpoint for pace analysis
 
 ### Workout Programs
 
 Access from **Edit Programs...** in the menu.
 
 Create interval programs with multiple segments. Each segment has:
-- Target speed (km/h)
-- Target incline (%)
+- Target speed (km/h) — editable via text field or stepper
+- Target incline (%) — editable via text field or stepper
 - Goal: time (minutes), distance (meters), or calories
 
 ## Architecture
@@ -97,25 +112,27 @@ Create interval programs with multiple segments. Each segment has:
 ```
 Treadmill/
 ├── Bluetooth/
-│   ├── FTMSProtocol.swift      # BLE FTMS encode/decode (pure logic, fully tested)
-│   └── TreadmillManager.swift  # CoreBluetooth scan/connect/command
+│   ├── FTMSProtocol.swift          # BLE FTMS encode/decode (pure logic, fully tested)
+│   └── TreadmillManager.swift      # CoreBluetooth scan/connect/command
 ├── Models/
-│   ├── TreadmillState.swift    # Observable live state
-│   ├── CoreDataModel.swift     # Programmatic Core Data model
-│   └── *+CoreData.swift        # Managed object subclasses
+│   ├── TreadmillState.swift        # Observable live state
+│   ├── CoreDataModel.swift         # Programmatic Core Data model
+│   └── *+CoreData.swift            # Managed object subclasses
 ├── Services/
-│   ├── PersistenceController.swift  # Core Data stack
-│   ├── SessionTracker.swift    # Auto-record workouts
-│   ├── ProgramEngine.swift     # Run interval programs
-│   ├── SettingsManager.swift   # UserDefaults + quick presets
-│   └── HealthKitManager.swift  # Apple Health integration (ready)
+│   ├── PersistenceController.swift # Core Data stack
+│   ├── SessionTracker.swift        # Auto-record workouts
+│   ├── ProgramEngine.swift         # Run interval programs
+│   ├── SettingsManager.swift       # UserDefaults + quick presets
+│   ├── HealthKitManager.swift      # Apple Health integration (ready when available)
+│   ├── StravaManager.swift         # Strava OAuth2 + TCX upload
+│   └── TCXGenerator.swift          # Generate TCX files from speed samples
 └── Views/
-    ├── MenuBarView content     # In TreadmillApp.swift
-    ├── HistoryWindow.swift     # Session list + trends
-    ├── SessionDetailView.swift # Per-session charts
-    ├── TrendsView.swift        # Weekly/monthly charts
-    ├── ProgramEditorView.swift # Create/edit programs
-    └── SettingsView.swift      # General + Presets tabs
+    ├── TreadmillApp.swift          # App entry, MenuBarExtra, menu content
+    ├── HistoryWindow.swift         # Session list + trends
+    ├── SessionDetailView.swift     # Per-session charts
+    ├── TrendsView.swift            # Weekly/monthly charts
+    ├── ProgramEditorView.swift     # Create/edit programs
+    └── SettingsView.swift          # General + Presets tabs
 ```
 
 ## FTMS Protocol
@@ -137,18 +154,24 @@ Uses the standard Bluetooth **Fitness Machine Service (FTMS)** protocol:
 # Generate Xcode project
 xcodegen generate
 
-# Build
-xcodebuild build -project Treadmill.xcodeproj -scheme Treadmill -destination 'platform=macOS' SYMROOT=build
+# Build (unsigned, for development)
+xcodebuild build -project Treadmill.xcodeproj -scheme Treadmill \
+  -destination 'platform=macOS' SYMROOT=build
 
-# Run tests
-xcodebuild test -project Treadmill.xcodeproj -scheme Treadmill -destination 'platform=macOS'
+# Run tests (33 tests: FTMS protocol, session tracker, program engine)
+xcodebuild test -project Treadmill.xcodeproj -scheme Treadmill \
+  -destination 'platform=macOS'
 
-# Package DMG
+# Package DMG + ZIP
 ./scripts/build.sh && ./scripts/create-dmg.sh
 
 # Create GitHub release
 ./scripts/release.sh 1.0.0
 ```
+
+### Code signing
+
+Strava OAuth and HealthKit require code signing. In `project.yml`, set your `DEVELOPMENT_TEAM` or configure signing in Xcode > Signing & Capabilities.
 
 ## License
 
