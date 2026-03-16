@@ -2,34 +2,16 @@ import SwiftUI
 
 @main
 struct TreadmillApp: App {
-    @State private var treadmillState = TreadmillState()
-    @State private var manager: TreadmillManager?
-    @State private var sessionTracker: SessionTracker?
-    @State private var programEngine: ProgramEngine?
-    @State private var hasSetup = false
-
-    private let persistence = PersistenceController.shared
-    private let settings = SettingsManager.shared
+    @State private var appState = AppState()
 
     var body: some Scene {
         MenuBarExtra {
-            MenuBarContentView(
-                treadmillState: treadmillState,
-                manager: manager,
-                programEngine: programEngine,
-                settings: settings,
-                onOpenHistory: { openWindow(id: "history") },
-                onOpenPrograms: { openWindow(id: "programs") },
-                onOpenSettings: { openWindow(id: "settings") }
-            )
-            .task {
-                if !hasSetup { setup() }
-            }
+            MenuBarContentView(appState: appState)
         } label: {
             HStack(spacing: 4) {
                 Image(systemName: "figure.walk")
-                if treadmillState.isConnected {
-                    Text(String(format: "%.1f", treadmillState.speed))
+                if appState.treadmill.isConnected {
+                    Text(String(format: "%.1f", appState.treadmill.speed))
                         .font(.system(.caption, design: .monospaced))
                 }
             }
@@ -37,140 +19,157 @@ struct TreadmillApp: App {
 
         Window("Workout History", id: "history") {
             HistoryWindow()
-                .environment(\.managedObjectContext, persistence.viewContext)
+                .environment(\.managedObjectContext, appState.persistence.viewContext)
         }
 
         Window("Edit Programs", id: "programs") {
             ProgramEditorView()
-                .environment(\.managedObjectContext, persistence.viewContext)
+                .environment(\.managedObjectContext, appState.persistence.viewContext)
         }
 
         Window("Settings", id: "settings") {
             SettingsView()
         }
     }
+}
 
-    @Environment(\.openWindow) private var openWindow
+/// Holds all app-level state, initialized eagerly at launch
+@Observable
+final class AppState {
+    let treadmill = TreadmillState()
+    let persistence = PersistenceController.shared
+    let settings = SettingsManager.shared
+    var manager: TreadmillManager!
+    var sessionTracker: SessionTracker!
+    var programEngine: ProgramEngine!
 
-    private func setup() {
-        hasSetup = true
-        let mgr = TreadmillManager(state: treadmillState)
-        manager = mgr
+    init() {
+        programEngine = ProgramEngine(state: treadmill)
         sessionTracker = SessionTracker(
-            state: treadmillState,
+            state: treadmill,
             persistence: persistence,
             minDuration: settings.minSessionDuration
         )
-        programEngine = ProgramEngine(state: treadmillState)
 
-        let workspace = NSWorkspace.shared
-        workspace.notificationCenter.addObserver(
-            forName: NSWorkspace.willSleepNotification,
-            object: nil, queue: .main
-        ) { _ in mgr.disconnect() }
-        workspace.notificationCenter.addObserver(
-            forName: NSWorkspace.didWakeNotification,
-            object: nil, queue: .main
-        ) { _ in mgr.startScanning() }
+        // Defer BLE init slightly so SwiftUI has time to set up
+        DispatchQueue.main.async { [self] in
+            manager = TreadmillManager(state: treadmill)
 
-        Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { _ in
-            Task { @MainActor in
-                sessionTracker?.check()
-                sessionTracker?.recordSample()
-                programEngine?.updateFromState()
-                if let speed = programEngine?.pendingSpeed {
-                    await mgr.setSpeed(speed)
-                    programEngine?.clearPendingCommands()
-                }
-                if let incline = programEngine?.pendingIncline {
-                    await mgr.setIncline(incline)
-                    programEngine?.clearPendingCommands()
-                }
-                if programEngine?.shouldStop == true {
-                    await mgr.stop()
-                    programEngine?.stop()
+            // Sleep/wake
+            let workspace = NSWorkspace.shared
+            workspace.notificationCenter.addObserver(
+                forName: NSWorkspace.willSleepNotification,
+                object: nil, queue: .main
+            ) { [weak self] _ in self?.manager.disconnect() }
+            workspace.notificationCenter.addObserver(
+                forName: NSWorkspace.didWakeNotification,
+                object: nil, queue: .main
+            ) { [weak self] _ in self?.manager.startScanning() }
+
+            // Periodic tracking
+            Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+                guard let self else { return }
+                Task { @MainActor in
+                    self.sessionTracker.check()
+                    self.sessionTracker.recordSample()
+                    self.programEngine.updateFromState()
+                    if let speed = self.programEngine.pendingSpeed {
+                        await self.manager.setSpeed(speed)
+                        self.programEngine.clearPendingCommands()
+                    }
+                    if let incline = self.programEngine.pendingIncline {
+                        await self.manager.setIncline(incline)
+                        self.programEngine.clearPendingCommands()
+                    }
+                    if self.programEngine.shouldStop {
+                        await self.manager.stop()
+                        self.programEngine.stop()
+                    }
                 }
             }
         }
     }
 }
 
-/// Menu bar content using standard menu items (no .window style — avoids layout crash)
+/// Menu content using standard menu items
 struct MenuBarContentView: View {
-    let treadmillState: TreadmillState
-    let manager: TreadmillManager?
-    let programEngine: ProgramEngine?
-    let settings: SettingsManager
-    let onOpenHistory: () -> Void
-    let onOpenPrograms: () -> Void
-    let onOpenSettings: () -> Void
+    let appState: AppState
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        // Connection status
+        let t = appState.treadmill
+
         Text(statusLine)
             .font(.headline)
 
         Divider()
 
-        if treadmillState.isConnected {
-            // Live stats
-            Text("Speed: \(String(format: "%.1f", treadmillState.speed)) km/h")
-            Text("Incline: \(String(format: "%.0f", treadmillState.incline))%")
-            Text("Distance: \(formatDistance(treadmillState.distance))")
-            Text("Time: \(formatTime(treadmillState.elapsed))")
-            Text("Calories: \(treadmillState.calories) kcal")
+        if t.isConnected {
+            Text("Speed: \(String(format: "%.1f", t.speed)) km/h")
+            Text("Incline: \(String(format: "%.0f", t.incline))%")
+            Text("Distance: \(formatDistance(t.distance))")
+            Text("Time: \(formatTime(t.elapsed))")
+            Text("Calories: \(t.calories) kcal")
 
             Divider()
 
-            // Controls
-            Button("Start") { Task { await manager?.start() } }
-                .disabled(treadmillState.isRunning)
-                .keyboardShortcut("s", modifiers: [])
-            Button("Stop") { Task { await manager?.stop() } }
-                .disabled(!treadmillState.isRunning)
-                .keyboardShortcut("x", modifiers: [])
-            Button("Pause") { Task { await manager?.pause() } }
-                .disabled(!treadmillState.isRunning)
-                .keyboardShortcut("p", modifiers: [])
+            Button("Start") {
+                Task { await appState.manager?.start() }
+            }
+            .disabled(t.isRunning)
+            .keyboardShortcut("s", modifiers: [])
+
+            Button("Stop") {
+                Task { await appState.manager?.stop() }
+            }
+            .disabled(!t.isRunning)
+            .keyboardShortcut("x", modifiers: [])
+
+            Button("Pause") {
+                Task { await appState.manager?.pause() }
+            }
+            .disabled(!t.isRunning)
+            .keyboardShortcut("p", modifiers: [])
 
             Divider()
 
-            // Speed adjustment
-            Button("Speed + (\(String(format: "%.1f", settings.speedIncrement)))") {
-                Task { await manager?.setSpeed(treadmillState.targetSpeed + settings.speedIncrement) }
+            let s = appState.settings
+            Button("Speed +") {
+                Task { await appState.manager?.setSpeed(t.targetSpeed + s.speedIncrement) }
             }
             .keyboardShortcut(.upArrow, modifiers: [])
-            Button("Speed - (\(String(format: "%.1f", settings.speedIncrement)))") {
-                Task { await manager?.setSpeed(treadmillState.targetSpeed - settings.speedIncrement) }
+
+            Button("Speed -") {
+                Task { await appState.manager?.setSpeed(t.targetSpeed - s.speedIncrement) }
             }
             .keyboardShortcut(.downArrow, modifiers: [])
 
-            // Incline adjustment
-            Button("Incline + (\(String(format: "%.0f", settings.inclineIncrement))%)") {
-                Task { await manager?.setIncline(treadmillState.targetIncline + settings.inclineIncrement) }
+            Button("Incline +") {
+                Task { await appState.manager?.setIncline(t.targetIncline + s.inclineIncrement) }
             }
             .keyboardShortcut(.rightArrow, modifiers: [])
-            Button("Incline - (\(String(format: "%.0f", settings.inclineIncrement))%)") {
-                Task { await manager?.setIncline(treadmillState.targetIncline - settings.inclineIncrement) }
+
+            Button("Incline -") {
+                Task { await appState.manager?.setIncline(t.targetIncline - s.inclineIncrement) }
             }
             .keyboardShortcut(.leftArrow, modifiers: [])
 
-            if let engine = programEngine, engine.isActive {
+            if let engine = appState.programEngine, engine.isActive {
                 Divider()
                 Text("Program: \(engine.programName ?? "Active")")
                 Text("Segment \(engine.currentSegmentIndex + 1)/\(engine.totalSegments) — \(Int(engine.segmentProgress * 100))%")
             }
         } else {
-            Text(treadmillState.connectionStatus.rawValue)
+            Text(t.connectionStatus.rawValue)
                 .foregroundStyle(.secondary)
         }
 
         Divider()
 
-        Button("Open History...") { onOpenHistory() }
+        Button("Open History...") { openWindow(id: "history") }
             .keyboardShortcut("h")
-        Button("Edit Programs...") { onOpenPrograms() }
-        Button("Settings...") { onOpenSettings() }
+        Button("Edit Programs...") { openWindow(id: "programs") }
+        Button("Settings...") { openWindow(id: "settings") }
             .keyboardShortcut(",")
 
         Divider()
@@ -180,8 +179,9 @@ struct MenuBarContentView: View {
     }
 
     private var statusLine: String {
-        if treadmillState.isConnected {
-            return "\(treadmillState.deviceName) — \(String(format: "%.1f", treadmillState.speed)) km/h"
+        let t = appState.treadmill
+        if t.isConnected {
+            return "\(t.deviceName) — \(String(format: "%.1f", t.speed)) km/h"
         }
         return "Treadmill"
     }

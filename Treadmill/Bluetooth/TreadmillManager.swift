@@ -20,10 +20,7 @@ final class TreadmillManager: NSObject {
     init(state: TreadmillState) {
         self.state = state
         super.init()
-        // Defer BLE init to avoid triggering state changes during SwiftUI layout
-        DispatchQueue.main.async { [self] in
-            centralManager = CBCentralManager(delegate: self, queue: nil)
-        }
+        centralManager = CBCentralManager(delegate: self, queue: nil)
     }
 
     // MARK: - Public API
