@@ -5,16 +5,8 @@ struct TreadmillApp: App {
     @State private var appState = AppState()
 
     var body: some Scene {
-        MenuBarExtra {
+        MenuBarExtra(appState.menuBarLabel, systemImage: "figure.walk") {
             MenuBarContentView(appState: appState)
-        } label: {
-            HStack(spacing: 4) {
-                Image(systemName: "figure.walk")
-                if appState.treadmill.isConnected && appState.treadmill.speed > 0 {
-                    Text(String(format: "%.1f", appState.treadmill.speed))
-                        .font(.system(.caption, design: .monospaced))
-                }
-            }
         }
 
         Window("Workout History", id: "history") {
@@ -45,6 +37,9 @@ final class AppState {
     var sessionTracker: SessionTracker!
     var programEngine: ProgramEngine!
 
+    /// Throttled label — updated every 2s, not on every BLE frame
+    var menuBarLabel: String = "Treadmill"
+
     init() {
         manager = TreadmillManager(state: treadmill)
         programEngine = ProgramEngine(state: treadmill)
@@ -54,7 +49,6 @@ final class AppState {
             minDuration: settings.minSessionDuration
         )
 
-        // Sleep/wake
         let mgr = manager
         let workspace = NSWorkspace.shared
         workspace.notificationCenter.addObserver(
@@ -66,12 +60,22 @@ final class AppState {
             object: nil, queue: .main
         ) { _ in mgr.startScanning() }
 
-        // Periodic tracking
-        Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+        // Update label + session tracking on a calm 2s timer
+        Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
             guard let self else { return }
             Task { @MainActor in
+                // Update menu bar label (throttled)
+                if self.treadmill.isConnected && self.treadmill.speed > 0 {
+                    self.menuBarLabel = String(format: "%.1f", self.treadmill.speed)
+                } else {
+                    self.menuBarLabel = "Treadmill"
+                }
+
+                // Session tracking
                 self.sessionTracker.check()
                 self.sessionTracker.recordSample()
+
+                // Program engine
                 self.programEngine.updateFromState()
                 if let speed = self.programEngine.pendingSpeed {
                     await self.manager.setSpeed(speed)
@@ -90,7 +94,7 @@ final class AppState {
     }
 }
 
-/// Snapshot of treadmill state — captured once when menu opens, prevents live re-renders
+/// Snapshot of treadmill state — captured once when menu opens
 struct MenuSnapshot {
     let isConnected: Bool
     let isRunning: Bool
@@ -136,13 +140,12 @@ struct MenuSnapshot {
     }
 }
 
-/// Menu content — snapshot-based to avoid re-renders from live BLE data
+/// Menu content — reads only from snapshot (no Observable)
 struct MenuBarContentView: View {
     let appState: AppState
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        // Snapshot state once when menu opens — no live binding
         let snap = MenuSnapshot(from: appState.treadmill)
         let mgr = appState.manager
         let s = appState.settings
