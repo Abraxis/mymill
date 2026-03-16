@@ -112,6 +112,19 @@ final class SessionTracker {
         saveSession(duration: duration)
     }
 
+    private func buildStravaSamples() -> [(timeOffset: TimeInterval, speed: Double, distance: Double)] {
+        var cumDist = 0.0
+        var lastTime = 0.0
+        return samples.map { sample in
+            let dt = sample.time - lastTime
+            if dt > 0 {
+                cumDist += (sample.speed / 3.6) * dt  // km/h to m/s * seconds = meters
+            }
+            lastTime = sample.time
+            return (timeOffset: sample.time, speed: sample.speed, distance: cumDist)
+        }
+    }
+
     private func saveSession(duration: TimeInterval) {
         let startDate = sessionStartDate ?? Date()
         let endDate = Date()
@@ -149,6 +162,18 @@ final class SessionTracker {
                 avgSpeedKmh: avgSpeed,
                 maxSpeedKmh: maxSpeed,
                 speedSamples: hkSamples
+            )
+        }
+
+        // Upload to Strava
+        let stravaSamples = buildStravaSamples()
+        Task {
+            await StravaManager.shared.uploadWorkout(
+                startDate: startDate,
+                durationSeconds: duration,
+                distanceMeters: distance,
+                calories: Int(calories),
+                speedSamples: stravaSamples
             )
         }
     }

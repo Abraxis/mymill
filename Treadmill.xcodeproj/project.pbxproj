@@ -21,7 +21,9 @@
 		7537EB993FA43CFAC9B01CF3 /* TrendsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E1396497FEA6AF1AC2ABA64 /* TrendsView.swift */; };
 		7B2B05437A66646FAD982C53 /* FTMSProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4727DB6832FFE8B4C4F520E5 /* FTMSProtocol.swift */; };
 		96FE58A86E46C2B08E69B4AE /* TreadmillApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3CCDAFD497A331B683756DB /* TreadmillApp.swift */; };
+		9B3955DA7E760B519B0047AC /* StravaManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B34FB2CF58715B49455895C /* StravaManager.swift */; };
 		9F87803CE7F28D947BB8371F /* ProgramEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE8E1E06543163CA0CAA4D3F /* ProgramEngine.swift */; };
+		A0C1DF06C88EE28F06537C5D /* TCXGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62CB39BAE031B0329408FBB1 /* TCXGenerator.swift */; };
 		A815DFEA1EF63EA15A49853C /* SettingsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 105BBEF58B5BCD68DAF9B5FF /* SettingsManager.swift */; };
 		B61249FD9236FDDE0B10D237 /* ProgramSegment+CoreData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39ADEAB0AADD7394F0FD00E1 /* ProgramSegment+CoreData.swift */; };
 		B69EB9BF5ACFBC2B67C87C38 /* PersistenceController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D7F456BF41F268598432F70 /* PersistenceController.swift */; };
@@ -53,9 +55,11 @@
 		368650DFDE4ECA68E825A680 /* Treadmill.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Treadmill.entitlements; sourceTree = "<group>"; };
 		38A78BC9B8364D89A6A6F0C5 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		39ADEAB0AADD7394F0FD00E1 /* ProgramSegment+CoreData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ProgramSegment+CoreData.swift"; sourceTree = "<group>"; };
+		3B34FB2CF58715B49455895C /* StravaManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StravaManager.swift; sourceTree = "<group>"; };
 		4727DB6832FFE8B4C4F520E5 /* FTMSProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FTMSProtocol.swift; sourceTree = "<group>"; };
 		4B881D04058980D703FB3688 /* SessionTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionTracker.swift; sourceTree = "<group>"; };
 		5C19948DCCA711E1B86EE324 /* HealthKitManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthKitManager.swift; sourceTree = "<group>"; };
+		62CB39BAE031B0329408FBB1 /* TCXGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TCXGenerator.swift; sourceTree = "<group>"; };
 		63D55714BB4F7F78C61CE66A /* FTMSProtocolTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FTMSProtocolTests.swift; sourceTree = "<group>"; };
 		6D7F456BF41F268598432F70 /* PersistenceController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersistenceController.swift; sourceTree = "<group>"; };
 		7998C26942DD6A8EC8B01EAE /* CoreDataModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoreDataModel.swift; sourceTree = "<group>"; };
@@ -149,6 +153,8 @@
 				DE8E1E06543163CA0CAA4D3F /* ProgramEngine.swift */,
 				4B881D04058980D703FB3688 /* SessionTracker.swift */,
 				105BBEF58B5BCD68DAF9B5FF /* SettingsManager.swift */,
+				3B34FB2CF58715B49455895C /* StravaManager.swift */,
+				62CB39BAE031B0329408FBB1 /* TCXGenerator.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -275,6 +281,8 @@
 				09C7802E342F0717C0A3A215 /* SessionTracker.swift in Sources */,
 				A815DFEA1EF63EA15A49853C /* SettingsManager.swift in Sources */,
 				3B486A33690938F009C03884 /* SettingsView.swift in Sources */,
+				9B3955DA7E760B519B0047AC /* StravaManager.swift in Sources */,
+				A0C1DF06C88EE28F06537C5D /* TCXGenerator.swift in Sources */,
 				96FE58A86E46C2B08E69B4AE /* TreadmillApp.swift in Sources */,
 				747B594DB58D3B41BAADAEA5 /* TreadmillManager.swift in Sources */,
 				4CE02B9E5BE8914873E163BD /* TreadmillState.swift in Sources */,

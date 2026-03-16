@@ -13,7 +13,7 @@ struct SettingsView: View {
                 .tabItem { Label("Quick Presets", systemImage: "star") }
                 .tag(1)
         }
-        .frame(width: 450, height: 620)
+        .frame(width: 450, height: 720)
         .navigationTitle("Settings")
     }
 }
@@ -23,6 +23,7 @@ struct SettingsView: View {
 private struct GeneralSettingsTab: View {
     @Bindable var settings = SettingsManager.shared
     @Bindable var healthKit = HealthKitManager.shared
+    @Bindable var strava = StravaManager.shared
 
     var body: some View {
         Form {
@@ -56,6 +57,38 @@ private struct GeneralSettingsTab: View {
                     Text("HealthKit requires the Apple Health app which is not yet available on macOS. Workouts will sync when running on a Mac with Health support or via a future update.")
                         .font(.caption)
                         .foregroundStyle(.tertiary)
+                }
+            }
+
+            Section("Strava") {
+                if strava.isConnected {
+                    HStack {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                        Text("Connected as \(strava.athleteName ?? "athlete")")
+                        Spacer()
+                        Button("Disconnect") { strava.disconnect() }
+                            .buttonStyle(.bordered)
+                    }
+                    Toggle("Auto-sync workouts", isOn: $strava.syncEnabled)
+                    if strava.syncEnabled {
+                        Text("Completed sessions are uploaded as indoor walking activities.")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
+                } else {
+                    HStack {
+                        Text("Not connected")
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Connect to Strava") {
+                            Task.detached {
+                                try? await StravaManager.shared.authorize()
+                            }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.orange)
+                    }
                 }
             }
 

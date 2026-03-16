@@ -33,6 +33,8 @@ targets:
         com.apple.security.app-sandbox: true
         com.apple.security.device.bluetooth: true
         com.apple.developer.healthkit: true
+        com.apple.security.network.client: true
+        com.apple.security.network.server: true
 
   TreadmillTests:
     type: bundle.unit-test
