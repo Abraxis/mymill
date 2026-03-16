@@ -21,6 +21,8 @@ targets:
       base:
         INFOPLIST_FILE: Treadmill/Info.plist
         CODE_SIGN_ENTITLEMENTS: Treadmill/Treadmill.entitlements
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: 7QYJGN67LC
         PRODUCT_BUNDLE_IDENTIFIER: com.mymill.app
         PRODUCT_NAME: Treadmill
         COMBINE_HIDPI_IMAGES: true
