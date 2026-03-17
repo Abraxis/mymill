@@ -5,11 +5,11 @@
     <key>LSUIElement</key>
     <true/>
     <key>NSBluetoothAlwaysUsageDescription</key>
-    <string>Treadmill needs Bluetooth to connect to your Merach T25</string>
+    <string>MyMill needs Bluetooth to connect to your Merach T25</string>
     <key>CFBundleName</key>
-    <string>Treadmill</string>
+    <string>MyMill</string>
     <key>CFBundleDisplayName</key>
-    <string>Treadmill</string>
+    <string>MyMill</string>
     <key>CFBundleIdentifier</key>
     <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
     <key>CFBundleVersion</key>
@@ -21,8 +21,8 @@
     <key>CFBundleExecutable</key>
     <string>$(EXECUTABLE_NAME)</string>
     <key>NSHealthShareUsageDescription</key>
-    <string>Treadmill reads your workout history to avoid duplicates.</string>
+    <string>MyMill reads your workout history to avoid duplicates.</string>
     <key>NSHealthUpdateUsageDescription</key>
-    <string>Treadmill saves your walking workouts to Apple Health.</string>
+    <string>MyMill saves your walking workouts to Apple Health.</string>
 </dict>
 </plist>

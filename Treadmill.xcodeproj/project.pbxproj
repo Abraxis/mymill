@@ -317,7 +317,7 @@
 					"@executable_path/../Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.mymill.app;
-				PRODUCT_NAME = Treadmill;
+				PRODUCT_NAME = MyMill;
 				SDKROOT = macosx;
 			};
 			name = Debug;
@@ -431,7 +431,7 @@
 					"@executable_path/../Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.mymill.app;
-				PRODUCT_NAME = Treadmill;
+				PRODUCT_NAME = MyMill;
 				SDKROOT = macosx;
 			};
 			name = Release;

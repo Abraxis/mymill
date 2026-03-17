@@ -1,11 +1,11 @@
 #!/bin/bash
-# Build, install to /Applications, and launch Treadmill.app
+# Build, install to /Applications, and launch MyMill.app
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 BUILD_DIR="$PROJECT_DIR/build"
-APP_NAME="Treadmill.app"
+APP_NAME="MyMill.app"
 INSTALL_DIR="/Applications"
 
 cd "$PROJECT_DIR"
@@ -32,7 +32,7 @@ fi
 
 # Kill running instance
 echo "==> Stopping existing instance..."
-pkill -x Treadmill 2>/dev/null || true
+pkill -x MyMill 2>/dev/null || true
 sleep 1
 
 # Install
@@ -44,4 +44,4 @@ cp -R "$APP_PATH" "$INSTALL_DIR/$APP_NAME"
 echo "==> Launching..."
 open "$INSTALL_DIR/$APP_NAME"
 
-echo "==> Done! Treadmill is running from $INSTALL_DIR/$APP_NAME"
+echo "==> Done! MyMill is running from $INSTALL_DIR/$APP_NAME"

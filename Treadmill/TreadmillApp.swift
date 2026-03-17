@@ -38,7 +38,7 @@ final class AppState {
     var programEngine: ProgramEngine!
 
     /// Throttled label — updated every 2s, not on every BLE frame
-    var menuBarLabel: String = "Treadmill"
+    var menuBarLabel: String = "MyMill"
 
     init() {
         manager = TreadmillManager(state: treadmill)
@@ -68,7 +68,7 @@ final class AppState {
                 if self.treadmill.isConnected && self.treadmill.speed > 0 {
                     self.menuBarLabel = String(format: "%.1f", self.treadmill.speed)
                 } else {
-                    self.menuBarLabel = "Treadmill"
+                    self.menuBarLabel = "MyMill"
                 }
 
                 // Session tracking
@@ -128,7 +128,7 @@ struct MenuSnapshot {
         if isConnected {
             return "\(deviceName) — \(isRunning ? String(format: "%.1f km/h", speed) : "Idle")"
         }
-        return "Treadmill"
+        return "MyMill"
     }
 
     var distanceFormatted: String {
@@ -227,7 +227,7 @@ struct MenuBarContentView: View {
 
         Divider()
 
-        Button("Quit Treadmill") { NSApplication.shared.terminate(nil) }
+        Button("Quit MyMill") { NSApplication.shared.terminate(nil) }
             .keyboardShortcut("q")
     }
 
