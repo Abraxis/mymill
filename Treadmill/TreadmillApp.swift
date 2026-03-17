@@ -107,6 +107,7 @@ struct MenuSnapshot {
     let calories: Int
     let targetSpeed: Double
     let targetIncline: Double
+    let lastError: String?
 
     init(from t: TreadmillState) {
         isConnected = t.isConnected
@@ -120,6 +121,7 @@ struct MenuSnapshot {
         calories = t.calories
         targetSpeed = t.targetSpeed
         targetIncline = t.targetIncline
+        lastError = t.lastError
     }
 
     var statusLine: String {
@@ -149,6 +151,7 @@ struct MenuBarContentView: View {
         let snap = MenuSnapshot(from: appState.treadmill)
         let mgr = appState.manager
         let s = appState.settings
+        let _ = { appState.treadmill.lastError = nil }()
 
         Text(snap.statusLine)
             .font(.headline)
@@ -200,6 +203,18 @@ struct MenuBarContentView: View {
         } else {
             Text(snap.connectionStatus)
                 .foregroundStyle(.secondary)
+
+            if snap.connectionStatus == "Not Connected" || snap.connectionStatus == "Scanning..." {
+                Divider()
+                Text("Turn on treadmill to connect")
+                    .foregroundStyle(.tertiary)
+            }
+        }
+
+        if let error = snap.lastError {
+            Divider()
+            Text("⚠ \(error)")
+                .foregroundStyle(.orange)
         }
 
         Divider()

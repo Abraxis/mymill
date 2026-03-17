@@ -56,18 +56,44 @@ final class TreadmillManager: NSObject {
     }
 
     func start() async {
-        if !state.hasControl { _ = await requestControl() }
-        guard controlPointChar != nil else { return }
+        guard controlPointChar != nil else {
+            state.lastError = "Not connected — turn on treadmill"
+            return
+        }
 
+        // Ensure we have FTMS control
+        if !state.hasControl {
+            _ = await requestControl()
+        }
+
+        // Try to wake treadmill from standby with Reset before Start.
+        // The Merach T25 is BLE-connected in standby but needs activation.
+        _ = await sendCommand(FTMSProtocol.encodeReset())
+        try? await Task.sleep(for: .milliseconds(500))
+
+        // Re-request control after reset (reset may drop it)
+        _ = await requestControl()
+
+        // Send start command
         let response = await sendCommand(FTMSProtocol.encodeStart())
         if response?.result == .success {
             state.isRunning = true
-            // Set target speed after start — treadmill ignores speed when stopped
+            // Set target speed — treadmill ignores speed when stopped
             let speed = max(state.targetSpeed, FTMSProtocol.speedMin)
             _ = await sendCommand(FTMSProtocol.encodeSetSpeed(kmh: speed))
             state.targetSpeed = speed
+
+            // Verify belt actually started
+            Task {
+                try? await Task.sleep(for: .seconds(4))
+                if state.speed == 0 && state.isRunning {
+                    state.lastError = "Belt not moving — press power on remote first"
+                }
+            }
+        } else if response == nil {
+            state.lastError = "No response — press power button on remote"
         } else {
-            state.lastError = "Start failed"
+            state.lastError = "Start failed — press power button on remote first"
         }
     }
 
