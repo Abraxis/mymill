@@ -26,10 +26,13 @@ final class TreadmillState {
     var hasControl: Bool = false
     var deviceName: String = ""
     var lastError: String?
+    var elevationGain: Double = 0
 
     /// Count of consecutive zero-speed frames (hysteresis for isRunning)
     private var zeroSpeedCount = 0
     private static let zeroSpeedThreshold = 3
+    private var lastDistance: Double = 0
+    private var wasRunning: Bool = false
 
     var isConnected: Bool {
         connectionStatus == .connected || connectionStatus == .ready
@@ -54,5 +57,25 @@ final class TreadmillState {
         if let i = frame.incline { incline = i }
         if let e = frame.totalEnergy { calories = Int(e) }
         if let t = frame.elapsedTime { elapsed = TimeInterval(t) }
+
+        // Elevation gain tracking
+        if isRunning {
+            if !wasRunning {
+                lastDistance = distance
+            } else {
+                if incline > 0 {
+                    let delta = distance - lastDistance
+                    if delta > 0 {
+                        elevationGain += delta * (incline / 100.0)
+                    }
+                }
+                lastDistance = distance
+            }
+        }
+        if !isRunning && wasRunning {
+            elevationGain = 0
+            lastDistance = 0
+        }
+        wasRunning = isRunning
     }
 }
