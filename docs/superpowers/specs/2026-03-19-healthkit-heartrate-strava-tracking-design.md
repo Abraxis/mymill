@@ -33,10 +33,11 @@ Add `HKQuantityType(.heartRate)` to `readTypes` in `HealthKitManager`. This requ
 ### New Method: fetchHeartRateSamples
 
 ```
-func fetchHeartRateSamples(from startDate: Date, to endDate: Date) async -> [(date: Date, bpm: Double)]
+func fetchHeartRateSamples(from startDate: Date, to endDate: Date) async -> [(date: Date, bpm: Int)]
 ```
 
-- Queries `HKQuantityType(.heartRate)` with `HKQuery.predicateForSamples(withStart:end:)`
+- Queries `HKQuantityType(.heartRate)` with `HKQuery.predicateForSamples(withStart:end:options: .strictStartDate)`
+- BPM values are rounded from `HKQuantity` doubles to `Int` at the query boundary
 - Sorted ascending by start date
 - Returns empty array if no data found (Apple Watch not worn, Garmin not synced, etc.)
 - Used by both automatic post-session fetch and on-demand detail view fetch
@@ -71,13 +72,25 @@ The 15s delay is a pragmatic choice — Apple Watch typically syncs HR within a 
 
 ## Strava Changes
 
-### Upload Return Value
+### Upload Return Value & Activity ID Extraction
 
-`uploadWorkout` currently returns nothing. Change to return `Int64?` (the Strava activity ID).
+`checkUploadStatus` currently returns only the status string and discards the rest of the JSON. Change it to return a struct:
+```swift
+struct UploadStatusResult {
+    let status: String
+    let activityId: Int64?  // nil while Strava is still processing
+}
+```
 
-`checkUploadStatus` response JSON contains `activity_id` when processing is complete. Extract and return it.
+The Strava Uploads API works in two stages:
+1. `uploadTCX` returns an **upload ID** (used for polling) — this is NOT the activity ID
+2. `checkUploadStatus` polls with the upload ID and returns `activity_id` once processing completes
 
-Both `uploadWorkout` and `reuploadSession` return the activity ID so it can be stored on the Core Data session.
+**Race condition handling**: `activity_id` may be null if Strava hasn't finished processing within the initial 3s poll. To handle this:
+- Poll up to 3 times with 5s intervals (total ~15s max wait)
+- If `activity_id` is still null after polling, return nil — the session will show the upload button instead of a link, and re-uploading will try again
+
+Both `uploadWorkout` and `reuploadSession` return `Int64?` (the activity ID) so it can be stored on the Core Data session.
 
 ### Heart Rate in TCX
 
@@ -100,6 +113,10 @@ heartRateSamples: [(timeOffset: TimeInterval, bpm: Int)]
 These are merged into the TCX trackpoints during generation.
 
 ## UI Changes
+
+### SessionDetailView — Core Data Write Access
+
+`SessionDetailView` currently has no Core Data write access (it receives `let session: WorkoutSession`). To support storing the Strava activity ID from re-uploads and fetching HR data, add `@Environment(\.managedObjectContext)` to the view. After mutating the session (setting `stravaActivityId`, `heartRateSamples`, etc.), call `try? viewContext.save()`.
 
 ### SessionDetailView
 
@@ -145,3 +162,4 @@ These give at-a-glance visibility into which sessions have HR data and Strava up
 - **Strava upload fails**: Activity ID remains nil. User can re-upload from detail view (existing functionality).
 - **Multiple HR sources**: HealthKit merges samples from all sources. If both Apple Watch and Garmin are writing HR, HealthKit handles deduplication.
 - **Old sessions**: `heartRateSamples` and `stravaActivityId` are optional with nil defaults, so existing sessions are unaffected. User can fetch HR retroactively for past sessions if HealthKit still has the data.
+- **Strava processing slow**: If `activity_id` isn't available after 3 poll attempts, upload is still successful — the session just won't have a Strava link until re-uploaded.
