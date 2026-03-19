@@ -65,8 +65,23 @@ private struct SessionRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(session.date, style: .date)
-                .font(.headline)
+            HStack {
+                Text(session.date, style: .date)
+                    .font(.headline)
+                Spacer()
+                if session.stravaActivityId != nil {
+                    Image(systemName: "arrow.up.to.line")
+                        .foregroundStyle(.orange)
+                        .font(.caption)
+                        .help("Uploaded to Strava")
+                }
+                if session.heartRateSamples != nil {
+                    Image(systemName: "heart.fill")
+                        .foregroundStyle(.red)
+                        .font(.caption)
+                        .help("Heart rate data available")
+                }
+            }
             HStack(spacing: 12) {
                 Label(session.durationFormatted, systemImage: "clock")
                 Label(String(format: "%.2f km", session.distanceKm), systemImage: "figure.walk")
