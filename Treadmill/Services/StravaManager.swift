@@ -99,7 +99,8 @@ final class StravaManager {
     }
 
     /// Re-upload a previously saved session to Strava
-    func reuploadSession(_ session: WorkoutSession) async throws {
+    @discardableResult
+    func reuploadSession(_ session: WorkoutSession) async throws -> Int64? {
         guard isConnected else { throw StravaError.uploadFailed("Not connected to Strava") }
 
         guard let token = await getValidToken() else {
@@ -107,6 +108,7 @@ final class StravaManager {
         }
 
         let samples = SessionTracker.buildStravaSamples(from: session.samples)
+        let hrSamples = session.hrSamples.map { (timeOffset: $0.time, bpm: $0.bpm) }
 
         let tcx = TCXGenerator.generate(
             startDate: session.date,
@@ -114,12 +116,15 @@ final class StravaManager {
             totalDistanceMeters: session.distance,
             calories: Int(session.calories),
             trackPoints: samples.map { sample in
-                TCXGenerator.TrackPoint(
+                let nearestHR = hrSamples.min(by: {
+                    abs($0.timeOffset - sample.timeOffset) < abs($1.timeOffset - sample.timeOffset)
+                })
+                return TCXGenerator.TrackPoint(
                     timeOffset: sample.timeOffset,
                     distanceMeters: sample.distance,
                     speedMPS: sample.speed / 3.6,
                     altitudeMeters: sample.altitude > 0 ? sample.altitude : nil,
-                    heartRateBPM: nil
+                    heartRateBPM: nearestHR?.bpm
                 )
             }
         )
@@ -127,13 +132,16 @@ final class StravaManager {
         let uploadId = try await uploadTCX(tcx, token: token, name: "Treadmill Walk")
         logger.info("Strava re-upload submitted: \(uploadId)")
 
-        try? await Task.sleep(for: .seconds(3))
-        let status = try await checkUploadStatus(uploadId, token: token)
-        logger.info("Strava re-upload status: \(status)")
+        let activityId = await pollForActivityId(uploadId, token: token)
 
-        if status.contains("error") {
-            throw StravaError.uploadFailed(status)
+        if activityId == nil {
+            if let result = try? await checkUploadStatus(uploadId, token: token),
+               result.status.contains("error") {
+                throw StravaError.uploadFailed(result.status)
+            }
         }
+
+        return activityId
     }
 
     // MARK: - Token Management
@@ -324,4 +332,9 @@ final class StravaManager {
 enum StravaError: Error {
     case denied
     case uploadFailed(String)
+}
+
+struct StravaUploadResult {
+    let status: String
+    let activityId: Int64?
 }
