@@ -24,6 +24,7 @@ final class HealthKitManager {
 
     private let readTypes: Set<HKObjectType> = [
         HKObjectType.workoutType(),
+        HKQuantityType(.heartRate),
     ]
 
     private init() {
@@ -138,6 +139,40 @@ final class HealthKitManager {
             logger.info("HealthKit workout saved: \(workout?.totalDistance?.description ?? "?")")
         } catch {
             logger.error("HealthKit save failed: \(error.localizedDescription)")
+        }
+    }
+
+    /// Fetch heart rate samples from HealthKit for a given time window
+    func fetchHeartRateSamples(from startDate: Date, to endDate: Date) async -> [(date: Date, bpm: Int)] {
+        guard isAvailable else { return [] }
+
+        if !isAuthorized {
+            let ok = await requestAuthorization()
+            guard ok else { return [] }
+        }
+
+        let heartRateType = HKQuantityType(.heartRate)
+        let predicate = HKQuery.predicateForSamples(withStart: startDate, end: endDate, options: .strictStartDate)
+        let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)
+
+        return await withCheckedContinuation { continuation in
+            let query = HKSampleQuery(
+                sampleType: heartRateType,
+                predicate: predicate,
+                limit: HKObjectQueryNoLimit,
+                sortDescriptors: [sortDescriptor]
+            ) { _, samples, error in
+                guard let samples = samples as? [HKQuantitySample], error == nil else {
+                    continuation.resume(returning: [])
+                    return
+                }
+                let bpmUnit = HKUnit.count().unitDivided(by: .minute())
+                let result = samples.map { sample in
+                    (date: sample.startDate, bpm: Int(sample.quantity.doubleValue(for: bpmUnit).rounded()))
+                }
+                continuation.resume(returning: result)
+            }
+            healthStore.execute(query)
         }
     }
 }
