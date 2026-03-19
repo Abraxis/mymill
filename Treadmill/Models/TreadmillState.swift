@@ -26,6 +26,11 @@ final class TreadmillState {
     var hasControl: Bool = false
     var deviceName: String = ""
     var lastError: String?
+
+    func consumeLastError() -> String? {
+        defer { lastError = nil }
+        return lastError
+    }
     var elevationGain: Double = 0
 
     /// Count of consecutive zero-speed frames (hysteresis for isRunning)

@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		0211BE07CCA09F4C8A43C503 /* ProgramEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7D97575E98474D27E8D1DF6 /* ProgramEditorView.swift */; };
+		02562BA891969AC4F5395AB8 /* TreadmillStateElevationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF665F5AB0316A61CB9009F1 /* TreadmillStateElevationTests.swift */; };
 		038CCCE593474D2FD24283A7 /* ProgramEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DA4981BEFCE3D098443DF22 /* ProgramEngineTests.swift */; };
 		09C7802E342F0717C0A3A215 /* SessionTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B881D04058980D703FB3688 /* SessionTracker.swift */; };
 		0E23BDDC3321D9C8390C7797 /* WorkoutProgram+CoreData.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5EF65E7A425D7FFB8CA44B8 /* WorkoutProgram+CoreData.swift */; };
@@ -16,7 +17,7 @@
 		4370DC21655C01E165209F9C /* CoreDataModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7998C26942DD6A8EC8B01EAE /* CoreDataModel.swift */; };
 		4CE02B9E5BE8914873E163BD /* TreadmillState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C0FD0C1C2A885A6B8A67EDB /* TreadmillState.swift */; };
 		538FE8CBEE5BE41A8A5B566D /* WorkoutSession+CoreData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C39F08B9D05E36944FC4BDE /* WorkoutSession+CoreData.swift */; };
-		6854371D625334800161CC97 /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35241B12C3F1BD1715EFBE89 /* MenuBarView.swift */; };
+		620ECAA960014F2022F0BF38 /* StatusBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7744EE4B78AE0C196DCA11CE /* StatusBarController.swift */; };
 		747B594DB58D3B41BAADAEA5 /* TreadmillManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E760A5981F92F6DBAE9BF5F5 /* TreadmillManager.swift */; };
 		7537EB993FA43CFAC9B01CF3 /* TrendsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E1396497FEA6AF1AC2ABA64 /* TrendsView.swift */; };
 		7B2B05437A66646FAD982C53 /* FTMSProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4727DB6832FFE8B4C4F520E5 /* FTMSProtocol.swift */; };
@@ -51,7 +52,6 @@
 		287922C91CC40671F28072DC /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		2C0FD0C1C2A885A6B8A67EDB /* TreadmillState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TreadmillState.swift; sourceTree = "<group>"; };
 		33B849607092F5B34761F965 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
-		35241B12C3F1BD1715EFBE89 /* MenuBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarView.swift; sourceTree = "<group>"; };
 		368650DFDE4ECA68E825A680 /* Treadmill.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Treadmill.entitlements; sourceTree = "<group>"; };
 		38A78BC9B8364D89A6A6F0C5 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		39ADEAB0AADD7394F0FD00E1 /* ProgramSegment+CoreData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ProgramSegment+CoreData.swift"; sourceTree = "<group>"; };
@@ -62,6 +62,7 @@
 		62CB39BAE031B0329408FBB1 /* TCXGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TCXGenerator.swift; sourceTree = "<group>"; };
 		63D55714BB4F7F78C61CE66A /* FTMSProtocolTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FTMSProtocolTests.swift; sourceTree = "<group>"; };
 		6D7F456BF41F268598432F70 /* PersistenceController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersistenceController.swift; sourceTree = "<group>"; };
+		7744EE4B78AE0C196DCA11CE /* StatusBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarController.swift; sourceTree = "<group>"; };
 		7998C26942DD6A8EC8B01EAE /* CoreDataModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoreDataModel.swift; sourceTree = "<group>"; };
 		8DA4981BEFCE3D098443DF22 /* ProgramEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgramEngineTests.swift; sourceTree = "<group>"; };
 		9E1396497FEA6AF1AC2ABA64 /* TrendsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrendsView.swift; sourceTree = "<group>"; };
@@ -73,6 +74,7 @@
 		DE8E1E06543163CA0CAA4D3F /* ProgramEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgramEngine.swift; sourceTree = "<group>"; };
 		E5EF65E7A425D7FFB8CA44B8 /* WorkoutProgram+CoreData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WorkoutProgram+CoreData.swift"; sourceTree = "<group>"; };
 		E760A5981F92F6DBAE9BF5F5 /* TreadmillManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TreadmillManager.swift; sourceTree = "<group>"; };
+		EF665F5AB0316A61CB9009F1 /* TreadmillStateElevationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TreadmillStateElevationTests.swift; sourceTree = "<group>"; };
 		F7D97575E98474D27E8D1DF6 /* ProgramEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgramEditorView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -94,6 +96,7 @@
 			children = (
 				38A78BC9B8364D89A6A6F0C5 /* Assets.xcassets */,
 				287922C91CC40671F28072DC /* Info.plist */,
+				7744EE4B78AE0C196DCA11CE /* StatusBarController.swift */,
 				368650DFDE4ECA68E825A680 /* Treadmill.entitlements */,
 				A3CCDAFD497A331B683756DB /* TreadmillApp.swift */,
 				DB2B32DEF6F18BF65C48030D /* Bluetooth */,
@@ -108,7 +111,6 @@
 			isa = PBXGroup;
 			children = (
 				A3A185CF478A13C5E0D161DA /* HistoryWindow.swift */,
-				35241B12C3F1BD1715EFBE89 /* MenuBarView.swift */,
 				F7D97575E98474D27E8D1DF6 /* ProgramEditorView.swift */,
 				B75A4283F911692D42CEDFFA /* SessionDetailView.swift */,
 				33B849607092F5B34761F965 /* SettingsView.swift */,
@@ -123,6 +125,7 @@
 				63D55714BB4F7F78C61CE66A /* FTMSProtocolTests.swift */,
 				8DA4981BEFCE3D098443DF22 /* ProgramEngineTests.swift */,
 				DB105C00C790B4198D319A93 /* SessionTrackerTests.swift */,
+				EF665F5AB0316A61CB9009F1 /* TreadmillStateElevationTests.swift */,
 			);
 			path = TreadmillTests;
 			sourceTree = "<group>";
@@ -261,6 +264,7 @@
 				F63FEC9E7A68CC9C571E011E /* FTMSProtocolTests.swift in Sources */,
 				038CCCE593474D2FD24283A7 /* ProgramEngineTests.swift in Sources */,
 				307B41C020DAF884A6BA48D1 /* SessionTrackerTests.swift in Sources */,
+				02562BA891969AC4F5395AB8 /* TreadmillStateElevationTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -272,7 +276,6 @@
 				7B2B05437A66646FAD982C53 /* FTMSProtocol.swift in Sources */,
 				F30C3BC7CE93FB8C212E149F /* HealthKitManager.swift in Sources */,
 				D95EAB77BF9954CFCE9CF719 /* HistoryWindow.swift in Sources */,
-				6854371D625334800161CC97 /* MenuBarView.swift in Sources */,
 				B69EB9BF5ACFBC2B67C87C38 /* PersistenceController.swift in Sources */,
 				0211BE07CCA09F4C8A43C503 /* ProgramEditorView.swift in Sources */,
 				9F87803CE7F28D947BB8371F /* ProgramEngine.swift in Sources */,
@@ -281,6 +284,7 @@
 				09C7802E342F0717C0A3A215 /* SessionTracker.swift in Sources */,
 				A815DFEA1EF63EA15A49853C /* SettingsManager.swift in Sources */,
 				3B486A33690938F009C03884 /* SettingsView.swift in Sources */,
+				620ECAA960014F2022F0BF38 /* StatusBarController.swift in Sources */,
 				9B3955DA7E760B519B0047AC /* StravaManager.swift in Sources */,
 				A0C1DF06C88EE28F06537C5D /* TCXGenerator.swift in Sources */,
 				96FE58A86E46C2B08E69B4AE /* TreadmillApp.swift in Sources */,
@@ -317,6 +321,7 @@
 					"@executable_path/../Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.mymill.app;
+				PRODUCT_MODULE_NAME = Treadmill;
 				PRODUCT_NAME = MyMill;
 				SDKROOT = macosx;
 			};
@@ -334,7 +339,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.treadmill.TreadmillTests;
 				SDKROOT = macosx;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Treadmill.app/Contents/MacOS/Treadmill";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/MyMill.app/Contents/MacOS/MyMill";
 			};
 			name = Release;
 		};
@@ -413,7 +418,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.treadmill.TreadmillTests;
 				SDKROOT = macosx;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Treadmill.app/Contents/MacOS/Treadmill";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/MyMill.app/Contents/MacOS/MyMill";
 			};
 			name = Debug;
 		};
@@ -431,6 +436,7 @@
 					"@executable_path/../Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.mymill.app;
+				PRODUCT_MODULE_NAME = Treadmill;
 				PRODUCT_NAME = MyMill;
 				SDKROOT = macosx;
 			};
