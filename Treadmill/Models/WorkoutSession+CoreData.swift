@@ -14,6 +14,10 @@ public class WorkoutSession: NSManagedObject {
     @NSManaged public var avgIncline: Double
     @NSManaged public var speedSamples: Data?
     @NSManaged public var elevationGain: Double
+    @NSManaged public var avgHeartRate: Double
+    @NSManaged public var maxHeartRate: Double
+    @NSManaged public var heartRateSamples: Data?
+    @NSManaged public var stravaActivityId: String?
 }
 
 extension WorkoutSession {
@@ -24,9 +28,19 @@ extension WorkoutSession {
         let incline: Double // percent
     }
 
+    struct HeartRateSample: Codable {
+        let time: Double  // seconds since session start
+        let bpm: Int
+    }
+
     var samples: [Sample] {
         guard let data = speedSamples else { return [] }
         return (try? JSONDecoder().decode([Sample].self, from: data)) ?? []
+    }
+
+    var hrSamples: [HeartRateSample] {
+        guard let data = heartRateSamples else { return [] }
+        return (try? JSONDecoder().decode([HeartRateSample].self, from: data)) ?? []
     }
 
     var durationFormatted: String {

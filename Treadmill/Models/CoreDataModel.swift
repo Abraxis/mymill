@@ -60,10 +60,32 @@ enum CoreDataModel {
         sessionElevationGain.attributeType = .doubleAttributeType
         sessionElevationGain.defaultValue = 0.0
 
+        let sessionAvgHeartRate = NSAttributeDescription()
+        sessionAvgHeartRate.name = "avgHeartRate"
+        sessionAvgHeartRate.attributeType = .doubleAttributeType
+        sessionAvgHeartRate.defaultValue = 0.0
+
+        let sessionMaxHeartRate = NSAttributeDescription()
+        sessionMaxHeartRate.name = "maxHeartRate"
+        sessionMaxHeartRate.attributeType = .doubleAttributeType
+        sessionMaxHeartRate.defaultValue = 0.0
+
+        let sessionHeartRateSamples = NSAttributeDescription()
+        sessionHeartRateSamples.name = "heartRateSamples"
+        sessionHeartRateSamples.attributeType = .binaryDataAttributeType
+        sessionHeartRateSamples.isOptional = true
+
+        let sessionStravaActivityId = NSAttributeDescription()
+        sessionStravaActivityId.name = "stravaActivityId"
+        sessionStravaActivityId.attributeType = .stringAttributeType
+        sessionStravaActivityId.isOptional = true
+
         session.properties = [
             sessionId, sessionDate, sessionDuration, sessionDistance,
             sessionCalories, sessionAvgSpeed, sessionMaxSpeed,
-            sessionAvgIncline, sessionSpeedSamples, sessionElevationGain
+            sessionAvgIncline, sessionSpeedSamples, sessionElevationGain,
+            sessionAvgHeartRate, sessionMaxHeartRate, sessionHeartRateSamples,
+            sessionStravaActivityId
         ]
 
         // MARK: - WorkoutProgram Entity
