@@ -6,6 +6,7 @@ enum TCXGenerator {
         let distanceMeters: Double      // cumulative
         let speedMPS: Double?           // meters per second
         let altitudeMeters: Double?     // cumulative elevation
+        let heartRateBPM: Int?          // beats per minute
     }
 
     static func generate(
@@ -53,6 +54,10 @@ enum TCXGenerator {
 
             if let alt = point.altitudeMeters {
                 xml += "<AltitudeMeters>\(String(format: "%.1f", alt))</AltitudeMeters>\n"
+            }
+
+            if let hr = point.heartRateBPM, hr > 0 {
+                xml += "<HeartRateBpm><Value>\(hr)</Value></HeartRateBpm>\n"
             }
 
             if let speed = point.speedMPS, speed > 0 {

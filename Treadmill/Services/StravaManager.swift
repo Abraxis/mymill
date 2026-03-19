@@ -51,47 +51,50 @@ final class StravaManager {
 
     // MARK: - Upload
 
+    @discardableResult
     func uploadWorkout(
         startDate: Date,
         durationSeconds: Double,
         distanceMeters: Double,
         calories: Int,
-        speedSamples: [(timeOffset: TimeInterval, speed: Double, distance: Double, altitude: Double)]
-    ) async {
-        guard syncEnabled, isConnected else { return }
+        speedSamples: [(timeOffset: TimeInterval, speed: Double, distance: Double, altitude: Double)],
+        heartRateSamples: [(timeOffset: TimeInterval, bpm: Int)] = []
+    ) async -> Int64? {
+        guard syncEnabled, isConnected else { return nil }
 
         guard let token = await getValidToken() else {
             logger.warning("No valid Strava token, skipping upload")
-            return
+            return nil
         }
 
-        // Generate TCX
+        // Generate TCX with HR interpolation
         let tcx = TCXGenerator.generate(
             startDate: startDate,
             totalTimeSeconds: durationSeconds,
             totalDistanceMeters: distanceMeters,
             calories: calories,
             trackPoints: speedSamples.map { sample in
-                TCXGenerator.TrackPoint(
+                let nearestHR = heartRateSamples.min(by: {
+                    abs($0.timeOffset - sample.timeOffset) < abs($1.timeOffset - sample.timeOffset)
+                })
+                return TCXGenerator.TrackPoint(
                     timeOffset: sample.timeOffset,
                     distanceMeters: sample.distance,
                     speedMPS: sample.speed / 3.6,
-                    altitudeMeters: sample.altitude > 0 ? sample.altitude : nil
+                    altitudeMeters: sample.altitude > 0 ? sample.altitude : nil,
+                    heartRateBPM: nearestHR?.bpm
                 )
             }
         )
 
-        // Upload
+        // Upload and poll for activity ID
         do {
             let uploadId = try await uploadTCX(tcx, token: token, name: "Treadmill Walk")
             logger.info("Strava upload submitted: \(uploadId)")
-
-            // Poll for completion
-            try? await Task.sleep(for: .seconds(3))
-            let status = try await checkUploadStatus(uploadId, token: token)
-            logger.info("Strava upload status: \(status)")
+            return await pollForActivityId(uploadId, token: token)
         } catch {
             logger.error("Strava upload failed: \(error.localizedDescription)")
+            return nil
         }
     }
 
@@ -115,7 +118,8 @@ final class StravaManager {
                     timeOffset: sample.timeOffset,
                     distanceMeters: sample.distance,
                     speedMPS: sample.speed / 3.6,
-                    altitudeMeters: sample.altitude > 0 ? sample.altitude : nil
+                    altitudeMeters: sample.altitude > 0 ? sample.altitude : nil,
+                    heartRateBPM: nil
                 )
             }
         )
@@ -279,12 +283,30 @@ final class StravaManager {
         return "\(json["id"] ?? "unknown")"
     }
 
-    private func checkUploadStatus(_ uploadId: String, token: String) async throws -> String {
+    private func checkUploadStatus(_ uploadId: String, token: String) async throws -> StravaUploadResult {
         var request = URLRequest(url: URL(string: "https://www.strava.com/api/v3/uploads/\(uploadId)")!)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         let (data, _) = try await URLSession.shared.data(for: request)
         let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
-        return json["status"] as? String ?? "unknown"
+        let status = json["status"] as? String ?? "unknown"
+        let activityId = json["activity_id"] as? Int64
+        return StravaUploadResult(status: status, activityId: activityId)
+    }
+
+    private func pollForActivityId(_ uploadId: String, token: String) async -> Int64? {
+        for attempt in 1...3 {
+            try? await Task.sleep(for: .seconds(5))
+            guard let result = try? await checkUploadStatus(uploadId, token: token) else { continue }
+            logger.info("Strava poll attempt \(attempt): status=\(result.status), activityId=\(String(describing: result.activityId))")
+            if let activityId = result.activityId {
+                return activityId
+            }
+            if result.status.contains("error") {
+                logger.error("Strava upload error: \(result.status)")
+                return nil
+            }
+        }
+        return nil
     }
 
     // MARK: - Helpers
