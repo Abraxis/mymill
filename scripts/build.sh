@@ -21,7 +21,7 @@ xcodebuild build \
     CODE_SIGNING_ALLOWED=NO \
     2>&1 | tail -20
 
-APP_PATH="$BUILD_DIR/Release/Treadmill.app"
+APP_PATH="$BUILD_DIR/Release/MyMill.app"
 
 if [ -d "$APP_PATH" ]; then
     echo ""

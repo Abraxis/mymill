@@ -20,7 +20,7 @@ if [ -z "$VERSION" ]; then
     exit 1
 fi
 
-echo "==> Releasing Treadmill v$VERSION"
+echo "==> Releasing MyMill v$VERSION"
 
 # Update version in Info.plist
 cd "$PROJECT_DIR"
@@ -34,8 +34,8 @@ echo "==> Building..."
 echo "==> Packaging..."
 "$SCRIPT_DIR/create-dmg.sh"
 
-DMG_PATH="$BUILD_DIR/Treadmill-${VERSION}-macOS.dmg"
-ZIP_PATH="$BUILD_DIR/Treadmill-${VERSION}-macOS.zip"
+DMG_PATH="$BUILD_DIR/MyMill-${VERSION}-macOS.dmg"
+ZIP_PATH="$BUILD_DIR/MyMill-${VERSION}-macOS.zip"
 
 # Tag and push
 echo "==> Tagging v$VERSION..."
@@ -47,14 +47,14 @@ git push origin main --tags
 # Create GitHub release
 echo "==> Creating GitHub release..."
 gh release create "v$VERSION" \
-    --title "Treadmill v$VERSION" \
+    --title "MyMill v$VERSION" \
     --notes "$(cat <<ENDOFBODY
-## Treadmill v$VERSION
+## MyMill v$VERSION
 
 macOS menu bar app for controlling the Merach T25 treadmill.
 
 ### Download
-- **DMG** (recommended): Drag Treadmill.app to Applications
+- **DMG** (recommended): Drag MyMill.app to Applications
 - **ZIP**: Extract and move to Applications
 
 ### Requirements
