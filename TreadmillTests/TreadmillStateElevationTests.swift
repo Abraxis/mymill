@@ -33,7 +33,7 @@ final class TreadmillStateElevationTests: XCTestCase {
         XCTAssertEqual(state.elevationGain, 0)
     }
 
-    func testElevationResetsWhenTreadmillStops() {
+    func testElevationPersistsWhenTreadmillStops() {
         let state = TreadmillState()
         state.update(from: FTMSProtocol.TreadmillDataFrame(
             speed: 5.0, avgSpeed: nil, totalDistance: 100,
@@ -43,8 +43,10 @@ final class TreadmillStateElevationTests: XCTestCase {
             speed: 5.0, avgSpeed: nil, totalDistance: 200,
             incline: 10, totalEnergy: nil, elapsedTime: nil
         ))
-        XCTAssertTrue(state.elevationGain > 0)
+        let gained = state.elevationGain
+        XCTAssertTrue(gained > 0)
 
+        // Stop — elevation should persist (not reset on pause/stop)
         for _ in 0..<3 {
             state.update(from: FTMSProtocol.TreadmillDataFrame(
                 speed: 0, avgSpeed: nil, totalDistance: 200,
@@ -52,31 +54,43 @@ final class TreadmillStateElevationTests: XCTestCase {
             ))
         }
         XCTAssertFalse(state.isRunning)
-        XCTAssertEqual(state.elevationGain, 0)
+        XCTAssertEqual(state.elevationGain, gained)
     }
 
-    func testElevationAnchorsOnRestart() {
+    func testElevationContinuesAccumulatingAfterRestart() {
         let state = TreadmillState()
+        // First run: 100m at 10% = 10m elevation
+        state.update(from: FTMSProtocol.TreadmillDataFrame(
+            speed: 5.0, avgSpeed: nil, totalDistance: 400,
+            incline: 10, totalEnergy: nil, elapsedTime: nil
+        ))
         state.update(from: FTMSProtocol.TreadmillDataFrame(
             speed: 5.0, avgSpeed: nil, totalDistance: 500,
             incline: 10, totalEnergy: nil, elapsedTime: nil
         ))
+        let firstGain = state.elevationGain
+        XCTAssertEqual(firstGain, 10.0, accuracy: 0.01)
+
+        // Stop
         for _ in 0..<3 {
             state.update(from: FTMSProtocol.TreadmillDataFrame(
                 speed: 0, avgSpeed: nil, totalDistance: 500,
                 incline: 0, totalEnergy: nil, elapsedTime: nil
             ))
         }
+
+        // Restart — re-anchor, no spurious delta
         state.update(from: FTMSProtocol.TreadmillDataFrame(
             speed: 5.0, avgSpeed: nil, totalDistance: 500,
             incline: 10, totalEnergy: nil, elapsedTime: nil
         ))
-        XCTAssertEqual(state.elevationGain, 0, "Re-anchor on restart, no gain yet")
+        XCTAssertEqual(state.elevationGain, firstGain, "No spurious gain on re-anchor")
 
+        // Second run: 100m at 10% = 10m more
         state.update(from: FTMSProtocol.TreadmillDataFrame(
             speed: 5.0, avgSpeed: nil, totalDistance: 600,
             incline: 10, totalEnergy: nil, elapsedTime: nil
         ))
-        XCTAssertEqual(state.elevationGain, 10.0, accuracy: 0.01)
+        XCTAssertEqual(state.elevationGain, 20.0, accuracy: 0.01)
     }
 }

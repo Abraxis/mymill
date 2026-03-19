@@ -13,6 +13,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     private let menu = NSMenu()
     private unowned let appState: AppState
     private var actions: [MenuAction] = []
+    private var presetActions: [MenuAction] = []
 
     // MARK: - Menu items (held for in-place updates)
 
@@ -289,23 +290,27 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     // MARK: - Presets
 
     private func rebuildPresets() {
-        // Remove old preset items
+        // Remove old preset items and their actions
         for _ in 0..<presetCount {
             menu.removeItem(at: presetInsertIndex)
         }
         presetCount = 0
+        presetActions.removeAll()
 
         let presets = appState.settings.quickPresets
         let mgr = appState.manager
         for preset in presets {
             let item = NSMenuItem()
             item.title = "⚡ \(preset.name) — \(String(format: "%.1f", preset.speed)) km/h, \(String(format: "%.0f", preset.incline))%"
-            wireAction(item) {
+            let action = MenuAction {
                 Task {
                     await mgr.setSpeed(preset.speed)
                     await mgr.setIncline(preset.incline)
                 }
             }
+            presetActions.append(action)
+            item.target = action
+            item.action = #selector(MenuAction.execute)
             menu.insertItem(item, at: presetInsertIndex + presetCount)
             presetCount += 1
         }

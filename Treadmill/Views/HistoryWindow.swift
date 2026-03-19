@@ -56,7 +56,11 @@ struct HistoryWindow: View {
         for index in offsets {
             viewContext.delete(sessions[index])
         }
-        try? viewContext.save()
+        do {
+            try viewContext.save()
+        } catch {
+            viewContext.rollback()
+        }
     }
 }
 

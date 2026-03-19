@@ -38,13 +38,12 @@ final class HealthKitManager {
             await MainActor.run {
                 isAuthorized = true
             }
-            print("[HealthKit] Authorization granted")
+            logger.info("Authorization granted")
             return true
         } catch {
-            print("[HealthKit] Authorization failed: \(error.localizedDescription)")
+            logger.error("Authorization failed: \(error.localizedDescription)")
             await MainActor.run {
                 isAuthorized = false
-                isAvailable = false
             }
             return false
         }

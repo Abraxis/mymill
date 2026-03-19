@@ -78,7 +78,8 @@ final class TreadmillState {
             }
         }
         if !isRunning && wasRunning {
-            elevationGain = 0
+            // Don't reset elevationGain — keep cumulative for the session
+            // (Strava path computes its own elevation from samples)
             lastDistance = 0
         }
         wasRunning = isRunning

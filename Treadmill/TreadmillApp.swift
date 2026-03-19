@@ -68,13 +68,14 @@ final class AppState {
 
                 // Program engine
                 self.programEngine.updateFromState()
-                if let speed = self.programEngine.pendingSpeed {
+                let pendingSpeed = self.programEngine.pendingSpeed
+                let pendingIncline = self.programEngine.pendingIncline
+                self.programEngine.clearPendingCommands()
+                if let speed = pendingSpeed {
                     await self.manager.setSpeed(speed)
-                    self.programEngine.clearPendingCommands()
                 }
-                if let incline = self.programEngine.pendingIncline {
+                if let incline = pendingIncline {
                     await self.manager.setIncline(incline)
-                    self.programEngine.clearPendingCommands()
                 }
                 if self.programEngine.shouldStop {
                     await self.manager.stop()

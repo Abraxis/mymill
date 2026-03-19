@@ -105,23 +105,4 @@ final class SessionTrackerTests: XCTestCase {
         }
     }
 
-    func testDisconnectGracePeriod() {
-        let state = TreadmillState()
-        let persistence = PersistenceController(inMemory: true)
-        let tracker = SessionTracker(state: state, persistence: persistence, minDuration: 0)
-
-        // Start session
-        state.isRunning = true
-        state.elapsed = 600
-        state.distance = 1000
-        tracker.check()
-
-        // Simulate disconnect (connection drops but isRunning hasn't been cleared by machine status)
-        state.connectionStatus = .disconnected
-        tracker.handleDisconnect()
-
-        // Should still be recording (grace period)
-        XCTAssertTrue(tracker.isRecording)
-        XCTAssertTrue(tracker.isInGracePeriod)
-    }
 }

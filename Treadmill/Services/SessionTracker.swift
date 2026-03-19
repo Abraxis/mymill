@@ -6,12 +6,10 @@ import os
 @Observable
 final class SessionTracker {
     private(set) var isRecording = false
-    private(set) var isInGracePeriod = false
 
     private let state: TreadmillState
     private let persistence: PersistenceController
     private let minDuration: TimeInterval
-    private let gracePeriodDuration: TimeInterval = 60
 
     private var sessionStartDate: Date?
     private var samples: [WorkoutSession.Sample] = []
@@ -21,8 +19,6 @@ final class SessionTracker {
     private var sessionStartDistance: Double = 0
     private var sessionStartElapsed: TimeInterval = 0
     private var sessionStartCalories: Int = 0
-    private var gracePeriodTimer: Task<Void, Never>?
-    private var wasRunning = false
 
     private let logger = Logger(subsystem: "com.treadmill.app", category: "SessionTracker")
 
@@ -34,15 +30,11 @@ final class SessionTracker {
 
     /// Call periodically (e.g., every second) or on state changes.
     func check() {
-        let running = state.isRunning
-
-        if running && !isRecording && !isInGracePeriod {
+        if state.isRunning && !isRecording {
             startRecording()
-        } else if !running && isRecording && !isInGracePeriod {
+        } else if !state.isRunning && isRecording {
             stopRecording()
         }
-
-        wasRunning = running
     }
 
     func recordSample() {
@@ -58,32 +50,6 @@ final class SessionTracker {
             inclineSum += state.incline
             inclineSampleCount += 1
         }
-    }
-
-    func handleDisconnect() {
-        guard isRecording else { return }
-        isInGracePeriod = true
-        gracePeriodTimer = Task {
-            try? await Task.sleep(for: .seconds(gracePeriodDuration))
-            guard !Task.isCancelled else { return }
-            await MainActor.run {
-                // Grace period expired — finalize session
-                self.isInGracePeriod = false
-                self.stopRecording()
-            }
-        }
-    }
-
-    func handleReconnect() {
-        guard isInGracePeriod else { return }
-        gracePeriodTimer?.cancel()
-        gracePeriodTimer = nil
-        isInGracePeriod = false
-
-        if !state.isRunning {
-            stopRecording()
-        }
-        // If still running, session continues seamlessly
     }
 
     // MARK: - Private

@@ -118,12 +118,12 @@ enum FTMSProtocol {
             offset += 4
         }
 
-        // Bit 5 = instantaneous pace (skip 1 byte: uint8)
+        // Bit 5 = instantaneous pace (uint8 per FTMS spec — 1 byte, units: km/min with 0.1 resolution)
         if flags & (1 << 5) != 0 {
             offset += 1
         }
 
-        // Bit 6 = average pace (skip 1 byte: uint8)
+        // Bit 6 = average pace (uint8 per FTMS spec — 1 byte, units: km/min with 0.1 resolution)
         if flags & (1 << 6) != 0 {
             offset += 1
         }

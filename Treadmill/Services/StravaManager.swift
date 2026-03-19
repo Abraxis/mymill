@@ -43,7 +43,12 @@ final class StravaManager {
     }
 
     func disconnect() {
-        UserDefaults.standard.removeObject(forKey: "stravaTokens")
+        let deleteQuery: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: Self.keychainService,
+            kSecAttrAccount as String: Self.keychainAccount,
+        ]
+        SecItemDelete(deleteQuery as CFDictionary)
         isConnected = false
         athleteName = nil
         syncEnabled = false
@@ -155,14 +160,48 @@ final class StravaManager {
         var isExpired: Bool { Int(Date().timeIntervalSince1970) >= expiresAt }
     }
 
+    private static let keychainService = "com.mymill.strava"
+    private static let keychainAccount = "tokens"
+
     private func saveTokens(_ tokens: Tokens) {
-        if let data = try? JSONEncoder().encode(tokens) {
-            UserDefaults.standard.set(data, forKey: "stravaTokens")
-        }
+        guard let data = try? JSONEncoder().encode(tokens) else { return }
+
+        // Delete existing item first
+        let deleteQuery: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: Self.keychainService,
+            kSecAttrAccount as String: Self.keychainAccount,
+        ]
+        SecItemDelete(deleteQuery as CFDictionary)
+
+        let addQuery: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: Self.keychainService,
+            kSecAttrAccount as String: Self.keychainAccount,
+            kSecValueData as String: data,
+        ]
+        SecItemAdd(addQuery as CFDictionary, nil)
     }
 
     private func loadTokens() -> Tokens? {
-        guard let data = UserDefaults.standard.data(forKey: "stravaTokens") else { return nil }
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: Self.keychainService,
+            kSecAttrAccount as String: Self.keychainAccount,
+            kSecReturnData as String: true,
+        ]
+        var result: AnyObject?
+        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
+              let data = result as? Data else {
+            // Migrate from UserDefaults if present
+            if let legacyData = UserDefaults.standard.data(forKey: "stravaTokens"),
+               let tokens = try? JSONDecoder().decode(Tokens.self, from: legacyData) {
+                saveTokens(tokens)
+                UserDefaults.standard.removeObject(forKey: "stravaTokens")
+                return tokens
+            }
+            return nil
+        }
         return try? JSONDecoder().decode(Tokens.self, from: data)
     }
 
@@ -180,6 +219,16 @@ final class StravaManager {
 
     private func startLocalServerAndGetCode() async throws -> String {
         try await withCheckedThrowingContinuation { continuation in
+            var resumed = false
+            let resumeOnce: (Result<String, Error>) -> Void = { result in
+                guard !resumed else { return }
+                resumed = true
+                switch result {
+                case .success(let value): continuation.resume(returning: value)
+                case .failure(let error): continuation.resume(throwing: error)
+                }
+            }
+
             do {
                 let params = NWParameters.tcp
                 httpListener = try NWListener(using: params, on: 8089)
@@ -195,14 +244,14 @@ final class StravaManager {
                                 connection.cancel()
                             })
                             self?.httpListener?.cancel()
-                            continuation.resume(returning: code)
+                            resumeOnce(.success(code))
                         } else if request.contains("error=") {
                             let html = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n<html><body><h2>Authorization denied</h2></body></html>"
                             connection.send(content: html.data(using: .utf8), completion: .contentProcessed { _ in
                                 connection.cancel()
                             })
                             self?.httpListener?.cancel()
-                            continuation.resume(throwing: StravaError.denied)
+                            resumeOnce(.failure(StravaError.denied))
                         }
                     }
                 }
@@ -220,7 +269,7 @@ final class StravaManager {
                 ]
                 NSWorkspace.shared.open(url.url!)
             } catch {
-                continuation.resume(throwing: error)
+                resumeOnce(.failure(error))
             }
         }
     }

@@ -11,7 +11,8 @@ final class TreadmillManager: NSObject {
     private var controlPointChar: CBCharacteristic?
     private var reconnectTask: Task<Void, Never>?
     private var pendingResponse: CheckedContinuation<FTMSProtocol.ControlPointResponse?, Never>?
-    private var commandLock = false
+    private let commandLock = NSLock()
+    private var commandInFlight = false
 
     private let logger = Logger(subsystem: "com.treadmill.app", category: "BLE")
 
@@ -142,38 +143,55 @@ final class TreadmillManager: NSObject {
     // MARK: - Command Serialization
 
     private func sendCommand(_ data: Data) async -> FTMSProtocol.ControlPointResponse? {
-        while commandLock {
+        // Serialize commands — wait for any in-flight command to finish
+        while true {
+            commandLock.lock()
+            if !commandInFlight {
+                commandInFlight = true
+                commandLock.unlock()
+                break
+            }
+            commandLock.unlock()
             try? await Task.sleep(for: .milliseconds(50))
         }
 
-        guard let peripheral, let char = controlPointChar else { return nil }
+        defer {
+            commandLock.lock()
+            commandInFlight = false
+            commandLock.unlock()
+        }
 
-        commandLock = true
-        defer { commandLock = false }
+        guard let peripheral, let char = controlPointChar else { return nil }
 
         let response: FTMSProtocol.ControlPointResponse? = await withCheckedContinuation { continuation in
             pendingResponse = continuation
             peripheral.writeValue(data, for: char, type: .withResponse)
 
+            // Timeout: resume with nil if no BLE response within 5s
             Task { [weak self] in
                 try? await Task.sleep(for: .seconds(5))
                 guard let self else { return }
-                if let c = self.pendingResponse {
-                    self.pendingResponse = nil
-                    c.resume(returning: nil)
-                }
+                self.resumePendingResponse(with: nil)
             }
         }
 
         return response
     }
 
+    /// Thread-safe resume of pendingResponse — prevents double-resume crash
+    private func resumePendingResponse(with value: FTMSProtocol.ControlPointResponse?) {
+        commandLock.lock()
+        let continuation = pendingResponse
+        pendingResponse = nil
+        commandLock.unlock()
+        continuation?.resume(returning: value)
+    }
+
     private func cancelPendingCommand() {
-        if let c = pendingResponse {
-            pendingResponse = nil
-            c.resume(returning: nil)
-        }
-        commandLock = false
+        resumePendingResponse(with: nil)
+        commandLock.lock()
+        commandInFlight = false
+        commandLock.unlock()
     }
 
     // MARK: - Reconnect
@@ -307,10 +325,7 @@ extension TreadmillManager: CBPeripheralDelegate {
             }
         case FTMSProtocol.controlPointUUID:
             if let response = FTMSProtocol.decodeControlPointResponse(data) {
-                if let c = pendingResponse {
-                    pendingResponse = nil
-                    c.resume(returning: response)
-                }
+                resumePendingResponse(with: response)
             }
         case FTMSProtocol.machineStatusUUID:
             handleMachineStatus(data)
