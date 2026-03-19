@@ -178,16 +178,53 @@ final class SessionTracker {
             )
         }
 
-        // Upload to Strava
+        // Delayed: fetch HR from HealthKit, then upload to Strava
         let stravaSamples = buildStravaSamples()
+        let sessionRef = session.objectID
+        let persistenceRef = persistence
         Task {
-            await StravaManager.shared.uploadWorkout(
+            // Wait for Apple Watch to flush HR data to HealthKit
+            try? await Task.sleep(for: .seconds(15))
+
+            // Fetch HR samples
+            let hrRaw = await HealthKitManager.shared.fetchHeartRateSamples(from: startDate, to: endDate)
+            let hrSamples = hrRaw.map {
+                WorkoutSession.HeartRateSample(time: $0.date.timeIntervalSince(startDate), bpm: $0.bpm)
+            }
+
+            // Update Core Data with HR data
+            if !hrSamples.isEmpty {
+                await MainActor.run {
+                    let ctx = persistenceRef.viewContext
+                    guard let session = try? ctx.existingObject(with: sessionRef) as? WorkoutSession else { return }
+                    let bpms = hrSamples.map(\.bpm)
+                    session.avgHeartRate = Double(bpms.reduce(0, +)) / Double(bpms.count)
+                    session.maxHeartRate = Double(bpms.max() ?? 0)
+                    session.heartRateSamples = try? JSONEncoder().encode(hrSamples)
+                    persistenceRef.save()
+                }
+            }
+
+            // Upload to Strava (with HR if available)
+            let hrForStrava = hrSamples.map { (timeOffset: $0.time, bpm: $0.bpm) }
+            let activityId = await StravaManager.shared.uploadWorkout(
                 startDate: startDate,
                 durationSeconds: duration,
                 distanceMeters: distance,
                 calories: Int(calories),
-                speedSamples: stravaSamples
+                speedSamples: stravaSamples,
+                heartRateSamples: hrForStrava
             )
+
+            // Store Strava activity ID
+            if let activityId {
+                await MainActor.run {
+                    let ctx = persistenceRef.viewContext
+                    guard let session = try? ctx.existingObject(with: sessionRef) as? WorkoutSession else { return }
+                    session.stravaActivityId = String(activityId)
+                    persistenceRef.save()
+                }
+            }
         }
     }
 }
