@@ -25,7 +25,11 @@ final class MyMillManager: NSObject {
     // MARK: - Public API
 
     func startScanning() {
-        guard centralManager != nil, centralManager.state == .poweredOn else { return }
+        guard centralManager != nil, centralManager.state == .poweredOn else {
+            logger.warning("startScanning skipped — centralManager state: \(self.centralManager?.state.rawValue ?? -1)")
+            return
+        }
+        logger.info("Starting BLE scan for peripherals with prefix '\(FTMSProtocol.deviceNamePrefix)'")
         state.connectionStatus = .scanning
         centralManager.scanForPeripherals(
             withServices: nil,
@@ -269,21 +273,39 @@ final class MyMillManager: NSObject {
 
 extension MyMillManager: CBCentralManagerDelegate {
     func centralManagerDidUpdateState(_ central: CBCentralManager) {
+        logger.info("BLE state changed: \(String(describing: central.state.rawValue)) (\(self.stateName(central.state)))")
         switch central.state {
         case .poweredOn:
             startScanning()
         case .poweredOff:
             state.connectionStatus = .poweredOff
         case .unauthorized:
+            logger.error("BLE unauthorized — check System Settings > Privacy & Security > Bluetooth")
             state.connectionStatus = .unauthorized
         default:
+            logger.warning("BLE state not ready: \(self.stateName(central.state))")
             state.connectionStatus = .disconnected
+        }
+    }
+
+    private func stateName(_ state: CBManagerState) -> String {
+        switch state {
+        case .unknown: return "unknown"
+        case .resetting: return "resetting"
+        case .unsupported: return "unsupported"
+        case .unauthorized: return "unauthorized"
+        case .poweredOff: return "poweredOff"
+        case .poweredOn: return "poweredOn"
+        @unknown default: return "unknown(\(state.rawValue))"
         }
     }
 
     func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral,
                         advertisementData: [String: Any], rssi RSSI: NSNumber) {
+        let name = peripheral.name ?? "(unnamed)"
+        logger.debug("Discovered peripheral: '\(name)' RSSI: \(RSSI)")
         guard let name = peripheral.name, name.hasPrefix(FTMSProtocol.deviceNamePrefix) else { return }
+        logger.info("Found target device: '\(name)' — connecting")
         central.stopScan()
         self.peripheral = peripheral
         peripheral.delegate = self

@@ -13,15 +13,29 @@ final class SessionTracker {
     private let persistence: PersistenceController
     private let minDuration: TimeInterval
 
-    private var sessionStartDate: Date?
+    private(set) var sessionStartDate: Date?
     private var samples: [WorkoutSession.Sample] = []
     private var maxSpeed: Double = 0
     private var inclineSum: Double = 0
     private var inclineSampleCount: Int = 0
-    private var sessionStartDistance: Double = 0
-    private var sessionStartElapsed: TimeInterval = 0
-    private var sessionStartCalories: Int = 0
+    private(set) var sessionStartDistance: Double = 0
+    private(set) var sessionStartElapsed: TimeInterval = 0
+    private(set) var sessionStartCalories: Int = 0
     private var ticksSinceSnapshot: Int = 0
+
+    /// Live session metrics for display while recording
+    var liveDuration: TimeInterval {
+        guard isRecording else { return 0 }
+        return state.elapsed - sessionStartElapsed
+    }
+    var liveDistance: Double {
+        guard isRecording else { return 0 }
+        return state.distance - sessionStartDistance
+    }
+    var liveCalories: Int {
+        guard isRecording else { return 0 }
+        return state.calories - sessionStartCalories
+    }
 
     private static let snapshotInterval = 5  // every 5 ticks × 2s = 10s
     private static let snapshotURL: URL = {
@@ -37,6 +51,14 @@ final class SessionTracker {
         self.state = state
         self.persistence = persistence
         self.minDuration = minDuration
+    }
+
+    /// Force-save the current session (e.g., on app termination).
+    /// Writes snapshot to disk so it can be recovered on next launch.
+    func saveOnTermination() {
+        guard isRecording else { return }
+        saveSnapshot()
+        logger.info("Session snapshot saved on termination")
     }
 
     /// Call periodically (e.g., every second) or on state changes.
@@ -132,7 +154,7 @@ final class SessionTracker {
         inclineSum = 0
         inclineSampleCount = 0
         ticksSinceSnapshot = 0
-        state.elevationGain = 0
+        state.resetElevationTracking()
         logger.info("Session recording started")
     }
 

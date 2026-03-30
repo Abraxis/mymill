@@ -9,6 +9,8 @@ struct MyMillApp: App {
         Window("Workout History", id: "history") {
             HistoryWindow()
                 .environment(\.managedObjectContext, appState.persistence.viewContext)
+                .environment(appState.sessionTracker!)
+                .environment(appState.mymill)
                 .onAppear { appState.openWindowAction = openWindow }
         }
         .defaultSize(width: 1000, height: 800)
@@ -60,6 +62,12 @@ final class AppState {
             forName: NSWorkspace.didWakeNotification,
             object: nil, queue: .main
         ) { _ in mgr.startScanning() }
+
+        // Save session snapshot on app termination so it can be recovered on next launch
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.willTerminateNotification,
+            object: nil, queue: .main
+        ) { [weak self] _ in self?.sessionTracker.saveOnTermination() }
 
         // Update menu + session tracking on a calm 2s timer
         Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in

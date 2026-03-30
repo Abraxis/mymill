@@ -119,14 +119,16 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         speedUpItem.title = "Speed + (\(String(format: "%.1f", settings.speedIncrement)))"
         wireAction(speedUpItem) { [weak self] in
             guard let s = self?.appState else { return }
-            Task { await s.manager.setSpeed(s.mymill.targetSpeed + s.settings.speedIncrement) }
+            let base = s.mymill.speed > 0 ? s.mymill.speed : s.mymill.targetSpeed
+            Task { await s.manager.setSpeed(base + s.settings.speedIncrement) }
         }
         menu.addItem(speedUpItem)
 
         speedDownItem.title = "Speed − (\(String(format: "%.1f", settings.speedIncrement)))"
         wireAction(speedDownItem) { [weak self] in
             guard let s = self?.appState else { return }
-            Task { await s.manager.setSpeed(s.mymill.targetSpeed - s.settings.speedIncrement) }
+            let base = s.mymill.speed > 0 ? s.mymill.speed : s.mymill.targetSpeed
+            Task { await s.manager.setSpeed(base - s.settings.speedIncrement) }
         }
         menu.addItem(speedDownItem)
 

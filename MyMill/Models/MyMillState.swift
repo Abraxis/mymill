@@ -37,15 +37,13 @@ final class MyMillState {
     /// Reset elevation tracking for a fresh session (not resume)
     func resetElevationTracking() {
         elevationGain = 0
-        lastDistance = 0
-        wasRunning = false
+        lastFrameTime = nil
     }
 
     /// Count of consecutive zero-speed frames (hysteresis for isRunning)
     private var zeroSpeedCount = 0
     private static let zeroSpeedThreshold = 3
-    private var lastDistance: Double = 0
-    private var wasRunning: Bool = false
+    private var lastFrameTime: Date?
 
     var isConnected: Bool {
         connectionStatus == .connected || connectionStatus == .ready
@@ -71,23 +69,19 @@ final class MyMillState {
         if let e = frame.totalEnergy { calories = Int(e) }
         if let t = frame.elapsedTime { elapsed = TimeInterval(t) }
 
-        // Elevation gain tracking
+        // Elevation gain tracking (speed × time based — matches saved session calculation)
+        let now = Date()
         if isRunning {
-            if !wasRunning {
-                lastDistance = distance
-            } else {
-                if incline > 0 {
-                    let delta = distance - lastDistance
-                    if delta > 0 {
-                        elevationGain += delta * (incline / 100.0)
-                    }
+            if let lastTime = lastFrameTime, incline > 0 {
+                let dt = now.timeIntervalSince(lastTime)
+                if dt > 0 && dt < 5 { // ignore gaps > 5s (disconnect, sleep, etc.)
+                    let segDist = (speed / 3.6) * dt  // km/h → m/s × seconds = meters
+                    elevationGain += segDist * (incline / 100.0)
                 }
-                lastDistance = distance
             }
+            lastFrameTime = now
+        } else {
+            lastFrameTime = nil
         }
-        if !isRunning && wasRunning && !isPaused {
-            lastDistance = 0
-        }
-        wasRunning = isRunning
     }
 }

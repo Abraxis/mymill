@@ -4,6 +4,8 @@ import CoreData
 
 struct HistoryWindow: View {
     @Environment(\.managedObjectContext) private var viewContext
+    @Environment(SessionTracker.self) private var sessionTracker: SessionTracker?
+    @Environment(MyMillState.self) private var mymill: MyMillState?
     @State private var selectedSession: WorkoutSession?
 
     @FetchRequest(
@@ -75,6 +77,10 @@ struct HistoryWindow: View {
 
     private var sessionList: some View {
         List(selection: $selectedSession) {
+            if let tracker = sessionTracker, let state = mymill,
+               tracker.isRecording || state.isPaused {
+                LiveSessionRow(tracker: tracker, state: state)
+            }
             ForEach(sessions, id: \.objectID) { session in
                 SessionRow(session: session)
                     .tag(session)
@@ -121,6 +127,35 @@ private struct OverallStatCard: View {
         .padding(.horizontal, 6)
         .background(color.opacity(0.08))
         .clipShape(RoundedRectangle(cornerRadius: 6))
+    }
+}
+
+private struct LiveSessionRow: View {
+    let tracker: SessionTracker
+    let state: MyMillState
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(state.isPaused ? "Paused" : "In Progress")
+                    .font(.subheadline.bold())
+                Spacer()
+                Image(systemName: state.isPaused ? "pause.circle.fill" : "record.circle")
+                    .foregroundStyle(state.isPaused ? .orange : .red)
+                    .font(.caption)
+            }
+            HStack(spacing: 8) {
+                let mins = Int(tracker.liveDuration) / 60
+                let secs = Int(tracker.liveDuration) % 60
+                Text(String(format: "%d:%02d", mins, secs))
+                let dist = tracker.liveDistance
+                Text(dist >= 1000 ? String(format: "%.2f km", dist / 1000) : "\(Int(dist)) m")
+                Text("\(tracker.liveCalories) cal")
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 2)
     }
 }
 
